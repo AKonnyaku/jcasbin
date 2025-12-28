@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1766962294489,
+  "lastUpdate": 1766963379272,
   "repoUrl": "https://github.com/AKonnyaku/jcasbin",
   "entries": {
     "JMH Benchmark": [
@@ -490,6 +490,252 @@ window.BENCHMARK_DATA = {
           {
             "name": "org.casbin.jcasbin.main.benchmark.BenchmarkMemory.measureMemory ( {\"scenario\":\"ABAC_Complex\"} )",
             "value": 335.5286586666667,
+            "unit": "ms/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "50104361+AKonnyaku@users.noreply.github.com",
+            "name": "Konnyaku",
+            "username": "AKonnyaku"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9aeb01e02d5dc12df6b3b4a65a134cbddcd5c65a",
+          "message": "Merge pull request #3 from AKonnyaku/benchmark-refractor-test\n\nci: refactor benchmark workflow and align runner with Go-Casbin standards",
+          "timestamp": "2025-12-29T07:06:20+08:00",
+          "tree_id": "0f1ae45290b7f6b5331b344cd140500d9156c983",
+          "url": "https://github.com/AKonnyaku/jcasbin/commit/9aeb01e02d5dc12df6b3b4a65a134cbddcd5c65a"
+        },
+        "date": 1766963378497,
+        "tool": "jmh",
+        "benches": [
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkEnforce.enforce ( {\"dataScale\":\"small\",\"modelType\":\"rbac\",\"useCache\":\"false\"} )",
+            "value": 23.905082561022326,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkEnforce.enforce ( {\"dataScale\":\"small\",\"modelType\":\"rbac\",\"useCache\":\"true\"} )",
+            "value": 7567.145901265799,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkEnforce.enforce ( {\"dataScale\":\"small\",\"modelType\":\"rbac_with_domains\",\"useCache\":\"false\"} )",
+            "value": 18.450048912458104,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkEnforce.enforce ( {\"dataScale\":\"small\",\"modelType\":\"rbac_with_domains\",\"useCache\":\"true\"} )",
+            "value": 5653.40247665677,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkEnforce.enforce ( {\"dataScale\":\"small\",\"modelType\":\"rbac_with_resource_roles\",\"useCache\":\"false\"} )",
+            "value": 21.416485796440714,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkEnforce.enforce ( {\"dataScale\":\"small\",\"modelType\":\"rbac_with_resource_roles\",\"useCache\":\"true\"} )",
+            "value": 7560.721919162689,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkEnforce.enforce ( {\"dataScale\":\"medium\",\"modelType\":\"rbac\",\"useCache\":\"false\"} )",
+            "value": 2.2164932944970794,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkEnforce.enforce ( {\"dataScale\":\"medium\",\"modelType\":\"rbac\",\"useCache\":\"true\"} )",
+            "value": 7523.366630218209,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkEnforce.enforce ( {\"dataScale\":\"medium\",\"modelType\":\"rbac_with_domains\",\"useCache\":\"false\"} )",
+            "value": 1.6892722978082275,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkEnforce.enforce ( {\"dataScale\":\"medium\",\"modelType\":\"rbac_with_domains\",\"useCache\":\"true\"} )",
+            "value": 5707.316247253683,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkEnforce.enforce ( {\"dataScale\":\"medium\",\"modelType\":\"rbac_with_resource_roles\",\"useCache\":\"false\"} )",
+            "value": 2.1462609166200166,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkEnforce.enforce ( {\"dataScale\":\"medium\",\"modelType\":\"rbac_with_resource_roles\",\"useCache\":\"true\"} )",
+            "value": 7600.027717555368,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkEnforce.enforce ( {\"dataScale\":\"large\",\"modelType\":\"rbac\",\"useCache\":\"false\"} )",
+            "value": 0.3224971695615724,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkEnforce.enforce ( {\"dataScale\":\"large\",\"modelType\":\"rbac\",\"useCache\":\"true\"} )",
+            "value": 1443.1318603744273,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkEnforce.enforce ( {\"dataScale\":\"large\",\"modelType\":\"rbac_with_domains\",\"useCache\":\"false\"} )",
+            "value": 0.2332957473238756,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkEnforce.enforce ( {\"dataScale\":\"large\",\"modelType\":\"rbac_with_domains\",\"useCache\":\"true\"} )",
+            "value": 0.22248581793961617,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkEnforce.enforce ( {\"dataScale\":\"large\",\"modelType\":\"rbac_with_resource_roles\",\"useCache\":\"false\"} )",
+            "value": 0.3149778616160537,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkEnforce.enforce ( {\"dataScale\":\"large\",\"modelType\":\"rbac_with_resource_roles\",\"useCache\":\"true\"} )",
+            "value": 1769.7630885631804,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkManagement.addPolicy ( {\"currentRuleSize\":\"1000\"} )",
+            "value": 577.7719735101864,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkManagement.addPolicy ( {\"currentRuleSize\":\"10000\"} )",
+            "value": 581.1578539967057,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkManagement.addPolicy ( {\"currentRuleSize\":\"100000\"} )",
+            "value": 595.3606444846123,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkManagement.hasPolicy ( {\"currentRuleSize\":\"1000\"} )",
+            "value": 6217.467417862154,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkManagement.hasPolicy ( {\"currentRuleSize\":\"10000\"} )",
+            "value": 5638.333908399619,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkManagement.hasPolicy ( {\"currentRuleSize\":\"100000\"} )",
+            "value": 4617.739890458431,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkManagement.removePolicy ( {\"currentRuleSize\":\"1000\"} )",
+            "value": 6798.645554242171,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkManagement.removePolicy ( {\"currentRuleSize\":\"10000\"} )",
+            "value": 0.7353388631093938,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkManagement.removePolicy ( {\"currentRuleSize\":\"100000\"} )",
+            "value": 0.04904358767289524,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkManagement.updatePolicy ( {\"currentRuleSize\":\"1000\"} )",
+            "value": 4648.1742940887525,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkManagement.updatePolicy ( {\"currentRuleSize\":\"10000\"} )",
+            "value": 4882.71820395919,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkManagement.updatePolicy ( {\"currentRuleSize\":\"100000\"} )",
+            "value": 4481.813594849359,
+            "unit": "ops/ms",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkMemory.measureMemory ( {\"scenario\":\"ACL\"} )",
+            "value": 333.042086,
+            "unit": "ms/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkMemory.measureMemory ( {\"scenario\":\"RBAC\"} )",
+            "value": 335.2226726666667,
+            "unit": "ms/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkMemory.measureMemory ( {\"scenario\":\"RBAC_Medium\"} )",
+            "value": 432.2699753333333,
+            "unit": "ms/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkMemory.measureMemory ( {\"scenario\":\"RBAC_Large\"} )",
+            "value": 1114.3427543333335,
+            "unit": "ms/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkMemory.measureMemory ( {\"scenario\":\"RBAC_With_Domains\"} )",
+            "value": 333.793466,
+            "unit": "ms/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkMemory.measureMemory ( {\"scenario\":\"Priority\"} )",
+            "value": 333.60902400000003,
+            "unit": "ms/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "org.casbin.jcasbin.main.benchmark.BenchmarkMemory.measureMemory ( {\"scenario\":\"ABAC_Complex\"} )",
+            "value": 331.14338933333335,
             "unit": "ms/op",
             "extra": "iterations: 3\nforks: 1\nthreads: 1"
           }
