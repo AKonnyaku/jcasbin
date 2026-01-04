@@ -28,6 +28,10 @@ target-bench/
 *.iml
 jmh-result.json
 
+# Python cache
+__pycache__/
+*.py[cod]
+
 # Benchmark temporary files
 base-bench.json
 pr-bench.json
