@@ -245,9 +245,32 @@ public class CachedEnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new CachedEnforcer("examples/priority_model_enforce_context.conf", "examples/priority_policy_enforce_context.csv", false);
+            Model m = newModel();
+            e = new CachedEnforcer(m);
             e.enableLog(false);
+            
+            // Add policies directly
+            e.addPolicy("p", "alice", "data1", "read", "allow");
+            e.addPolicy("p", "data1_deny_group", "data1", "read", "deny");
+            e.addPolicy("p", "data1_deny_group", "data1", "write", "deny");
+            e.addPolicy("p", "alice", "data1", "write", "allow");
+            e.addGroupingPolicy("g", "alice", "data1_deny_group");
+            e.addPolicy("p", "data2_allow_group", "data2", "read", "allow");
+            e.addPolicy("p", "bob", "data2", "read", "deny");
+            e.addPolicy("p", "bob", "data2", "write", "deny");
+            e.addGroupingPolicy("g", "bob", "data2_allow_group");
+
             ctx = new EnforceContext("", "", "2", "2");
+        }
+
+        private Model newModel() {
+            Model m = new Model();
+            m.addDef("r", "r", "sub, obj, act");
+            m.addDef("p", "p", "sub, obj, act, eft");
+            m.addDef("g", "g", "_, _");
+            m.addDef("e", "e", "priority(p.eft) || deny");
+            m.addDef("m", "m", "g(r.sub, p.sub) && r.obj == p.obj && r.act == p.act");
+            return m;
         }
     }
 
