@@ -53,7 +53,7 @@ public class EnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new Enforcer("examples/basic_model.conf", "examples/basic_policy.csv");
+            e = new Enforcer("examples/basic_model.conf", "examples/basic_policy.csv", false);
             e.enableLog(false);
         }
     }
@@ -69,7 +69,7 @@ public class EnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new Enforcer("examples/rbac_model.conf", "examples/rbac_policy.csv");
+            e = new Enforcer("examples/rbac_model.conf", "examples/rbac_policy.csv", false);
             e.enableLog(false);
         }
     }
@@ -113,7 +113,7 @@ public class EnforcerBenchmark {
                     throw new IllegalArgumentException("Unknown size: " + size);
             }
 
-            e = new Enforcer("examples/rbac_model.conf");
+            e = new Enforcer("examples/rbac_model.conf", "", false);
             e.enableLog(false);
             e.enableAutoBuildRoleLinks(false);
 
@@ -173,7 +173,7 @@ public class EnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new Enforcer("examples/rbac_model.conf");
+            e = new Enforcer("examples/rbac_model.conf", "", false);
             e.enableLog(false);
 
             for (int i = 0; i < 100; i++) {
@@ -196,7 +196,7 @@ public class EnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new Enforcer("examples/rbac_model.conf");
+            e = new Enforcer("examples/rbac_model.conf", "", false);
             e.enableLog(false);
 
             List<List<String>> pPolicies = new ArrayList<>(1000);
@@ -224,7 +224,7 @@ public class EnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new Enforcer("examples/rbac_model.conf");
+            e = new Enforcer("examples/rbac_model.conf", "", false);
             e.enableLog(false);
 
             List<List<String>> pPolicies = new ArrayList<>(10000);
@@ -252,7 +252,7 @@ public class EnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new Enforcer("examples/rbac_with_resource_roles_model.conf", "examples/rbac_with_resource_roles_policy.csv");
+            e = new Enforcer("examples/rbac_with_resource_roles_model.conf", "examples/rbac_with_resource_roles_policy.csv", false);
             e.enableLog(false);
         }
     }
@@ -268,7 +268,7 @@ public class EnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new Enforcer("examples/rbac_with_domains_model.conf", "examples/rbac_with_domains_policy.csv");
+            e = new Enforcer("examples/rbac_with_domains_model.conf", "examples/rbac_with_domains_policy.csv", false);
             e.enableLog(false);
         }
     }
@@ -285,7 +285,7 @@ public class EnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new Enforcer("examples/abac_model.conf");
+            e = new Enforcer("examples/abac_model.conf", "", false);
             e.enableLog(false);
             data1 = new ModelUnitTest.TestResource("data1", "alice");
         }
@@ -303,7 +303,7 @@ public class EnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new Enforcer("examples/abac_rule_model.conf");
+            e = new Enforcer("examples/abac_rule_model.conf", "", false);
             e.enableLog(false);
             sub = new TestSubject("alice", 18);
             for (int i = 0; i < 1000; i++) {
@@ -323,7 +323,7 @@ public class EnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new Enforcer("examples/keymatch_model.conf", "examples/keymatch_policy.csv");
+            e = new Enforcer("examples/keymatch_model.conf", "examples/keymatch_policy.csv", false);
             e.enableLog(false);
         }
     }
@@ -339,7 +339,7 @@ public class EnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new Enforcer("examples/rbac_with_deny_model.conf", "examples/rbac_with_deny_policy.csv");
+            e = new Enforcer("examples/rbac_with_deny_model.conf", "examples/rbac_with_deny_policy.csv", false);
             e.enableLog(false);
         }
     }
@@ -355,7 +355,7 @@ public class EnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new Enforcer("examples/priority_model.conf", "examples/priority_policy.csv");
+            e = new Enforcer("examples/priority_model.conf", "examples/priority_policy.csv", false);
             e.enableLog(false);
         }
     }
@@ -371,7 +371,7 @@ public class EnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new Enforcer("examples/performance/rbac_with_pattern_large_scale_model.conf", "examples/performance/rbac_with_pattern_large_scale_policy.csv");
+            e = new Enforcer("examples/performance/rbac_with_pattern_large_scale_model.conf", "examples/performance/rbac_with_pattern_large_scale_policy.csv", false);
             e.enableLog(false);
             e.addNamedDomainMatchingFunc("g", "", BuiltInFunctions::keyMatch4);
             e.buildRoleLinks();

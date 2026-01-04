@@ -35,7 +35,7 @@ public class CachedEnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new CachedEnforcer("examples/basic_model.conf", "examples/basic_policy.csv");
+            e = new CachedEnforcer("examples/basic_model.conf", "examples/basic_policy.csv", false);
             e.enableLog(false);
         }
     }
@@ -51,7 +51,7 @@ public class CachedEnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new CachedEnforcer("examples/rbac_model.conf", "examples/rbac_policy.csv");
+            e = new CachedEnforcer("examples/rbac_model.conf", "examples/rbac_policy.csv", false);
             e.enableLog(false);
         }
     }
@@ -67,7 +67,7 @@ public class CachedEnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new CachedEnforcer("examples/rbac_model.conf");
+            e = new CachedEnforcer("examples/rbac_model.conf", "", false);
             e.enableLog(false);
 
             for (int i = 0; i < 100; i++) {
@@ -90,7 +90,7 @@ public class CachedEnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new CachedEnforcer("examples/rbac_model.conf");
+            e = new CachedEnforcer("examples/rbac_model.conf", "", false);
             e.enableLog(false);
 
             List<List<String>> pPolicies = new ArrayList<>(1000);
@@ -118,7 +118,7 @@ public class CachedEnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new CachedEnforcer("examples/rbac_model.conf");
+            e = new CachedEnforcer("examples/rbac_model.conf", "", false);
             e.enableLog(false);
 
             List<List<String>> pPolicies = new ArrayList<>(10000);
@@ -146,7 +146,7 @@ public class CachedEnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new CachedEnforcer("examples/rbac_with_resource_roles_model.conf", "examples/rbac_with_resource_roles_policy.csv");
+            e = new CachedEnforcer("examples/rbac_with_resource_roles_model.conf", "examples/rbac_with_resource_roles_policy.csv", false);
             e.enableLog(false);
         }
     }
@@ -162,7 +162,7 @@ public class CachedEnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new CachedEnforcer("examples/rbac_with_domains_model.conf", "examples/rbac_with_domains_policy.csv");
+            e = new CachedEnforcer("examples/rbac_with_domains_model.conf", "examples/rbac_with_domains_policy.csv", false);
             e.enableLog(false);
         }
     }
@@ -179,7 +179,7 @@ public class CachedEnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new CachedEnforcer("examples/abac_model.conf");
+            e = new CachedEnforcer("examples/abac_model.conf", "", false);
             e.enableLog(false);
             data1 = new ModelUnitTest.TestResource("data1", "alice");
         }
@@ -196,7 +196,7 @@ public class CachedEnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new CachedEnforcer("examples/keymatch_model.conf", "examples/keymatch_policy.csv");
+            e = new CachedEnforcer("examples/keymatch_model.conf", "examples/keymatch_policy.csv", false);
             e.enableLog(false);
         }
     }
@@ -212,7 +212,7 @@ public class CachedEnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new CachedEnforcer("examples/rbac_with_deny_model.conf", "examples/rbac_with_deny_policy.csv");
+            e = new CachedEnforcer("examples/rbac_with_deny_model.conf", "examples/rbac_with_deny_policy.csv", false);
             e.enableLog(false);
         }
     }
@@ -228,7 +228,7 @@ public class CachedEnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new CachedEnforcer("examples/priority_model.conf", "examples/priority_policy.csv");
+            e = new CachedEnforcer("examples/priority_model.conf", "examples/priority_policy.csv", false);
             e.enableLog(false);
         }
     }
@@ -245,7 +245,7 @@ public class CachedEnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new CachedEnforcer("examples/priority_model_enforce_context.conf", "examples/priority_policy_enforce_context.csv");
+            e = new CachedEnforcer("examples/priority_model_enforce_context.conf", "examples/priority_policy_enforce_context.csv", false);
             e.enableLog(false);
             ctx = new EnforceContext("", "", "2", "2");
         }
@@ -262,7 +262,7 @@ public class CachedEnforcerBenchmark {
 
         @Setup
         public void setup() {
-            e = new CachedEnforcer("examples/rbac_model.conf");
+            e = new CachedEnforcer("examples/rbac_model.conf", "", false);
             e.enableLog(false);
 
             List<List<String>> pPolicies = new ArrayList<>(10000);

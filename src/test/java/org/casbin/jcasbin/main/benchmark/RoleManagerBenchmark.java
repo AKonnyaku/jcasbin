@@ -20,7 +20,7 @@ public class RoleManagerBenchmark {
 
         @Setup
         public void setup() {
-            Enforcer e = new Enforcer("examples/rbac_model.conf");
+            Enforcer e = new Enforcer("examples/rbac_model.conf", "", false);
             e.enableLog(false);
             e.enableAutoBuildRoleLinks(false);
 
@@ -53,7 +53,7 @@ public class RoleManagerBenchmark {
 
         @Setup
         public void setup() {
-            Enforcer e = new Enforcer("examples/rbac_model.conf");
+            Enforcer e = new Enforcer("examples/rbac_model.conf", "", false);
             e.enableLog(false);
             e.enableAutoBuildRoleLinks(false);
 
@@ -88,7 +88,7 @@ public class RoleManagerBenchmark {
 
         @Setup
         public void setup() {
-            Enforcer e = new Enforcer("examples/rbac_model.conf");
+            Enforcer e = new Enforcer("examples/rbac_model.conf", "", false);
             e.enableLog(false);
 
             List<List<String>> pPolicies = new ArrayList<>(10000);
@@ -121,7 +121,7 @@ public class RoleManagerBenchmark {
 
         @Setup
         public void setup() {
-            e = new Enforcer("examples/performance/rbac_with_pattern_large_scale_model.conf", "examples/performance/rbac_with_pattern_large_scale_policy.csv");
+            e = new Enforcer("examples/performance/rbac_with_pattern_large_scale_model.conf", "examples/performance/rbac_with_pattern_large_scale_policy.csv", false);
             e.enableLog(false);
             e.addNamedMatchingFunc("g", "", BuiltInFunctions::keyMatch4);
         }
@@ -138,7 +138,7 @@ public class RoleManagerBenchmark {
 
         @Setup
         public void setup() {
-            e = new Enforcer("examples/performance/rbac_with_pattern_large_scale_model.conf", "examples/performance/rbac_with_pattern_large_scale_policy.csv");
+            e = new Enforcer("examples/performance/rbac_with_pattern_large_scale_model.conf", "examples/performance/rbac_with_pattern_large_scale_policy.csv", false);
             e.enableLog(false);
             e.addNamedDomainMatchingFunc("g", "", BuiltInFunctions::keyMatch4);
         }
@@ -155,7 +155,7 @@ public class RoleManagerBenchmark {
 
         @Setup
         public void setup() {
-            e = new Enforcer("examples/performance/rbac_with_pattern_large_scale_model.conf", "examples/performance/rbac_with_pattern_large_scale_policy.csv");
+            e = new Enforcer("examples/performance/rbac_with_pattern_large_scale_model.conf", "examples/performance/rbac_with_pattern_large_scale_policy.csv", false);
             e.enableLog(false);
             e.addNamedMatchingFunc("g", "", BuiltInFunctions::keyMatch4);
             e.addNamedDomainMatchingFunc("g", "", BuiltInFunctions::keyMatch4);
@@ -173,7 +173,7 @@ public class RoleManagerBenchmark {
 
         @Setup
         public void setup() {
-            Enforcer e = new Enforcer("examples/performance/rbac_with_pattern_large_scale_model.conf", "examples/performance/rbac_with_pattern_large_scale_policy.csv");
+            Enforcer e = new Enforcer("examples/performance/rbac_with_pattern_large_scale_model.conf", "examples/performance/rbac_with_pattern_large_scale_policy.csv", false);
             e.enableLog(false);
             e.addNamedMatchingFunc("g", "", BuiltInFunctions::keyMatch4);
             rm = e.getRoleManager();
@@ -191,7 +191,7 @@ public class RoleManagerBenchmark {
 
         @Setup
         public void setup() {
-            Enforcer e = new Enforcer("examples/performance/rbac_with_pattern_large_scale_model.conf", "examples/performance/rbac_with_pattern_large_scale_policy.csv");
+            Enforcer e = new Enforcer("examples/performance/rbac_with_pattern_large_scale_model.conf", "examples/performance/rbac_with_pattern_large_scale_policy.csv", false);
             e.enableLog(false);
             e.addNamedDomainMatchingFunc("g", "", BuiltInFunctions::keyMatch4);
             rm = e.getRoleManager();
@@ -209,7 +209,7 @@ public class RoleManagerBenchmark {
 
         @Setup
         public void setup() {
-            Enforcer e = new Enforcer("examples/performance/rbac_with_pattern_large_scale_model.conf", "examples/performance/rbac_with_pattern_large_scale_policy.csv");
+            Enforcer e = new Enforcer("examples/performance/rbac_with_pattern_large_scale_model.conf", "examples/performance/rbac_with_pattern_large_scale_policy.csv", false);
             e.enableLog(false);
             e.addNamedMatchingFunc("g", "", BuiltInFunctions::keyMatch4);
             e.addNamedDomainMatchingFunc("g", "", BuiltInFunctions::keyMatch4);
@@ -228,7 +228,7 @@ public class RoleManagerBenchmark {
 
         @Setup
         public void setup() {
-            Enforcer e = new Enforcer("examples/rbac_with_pattern_model.conf", "examples/rbac_with_pattern_policy.csv");
+            Enforcer e = new Enforcer("examples/rbac_with_pattern_model.conf", "examples/rbac_with_pattern_policy.csv", false);
             e.enableLog(false);
             e.addNamedMatchingFunc("g2", "keyMatch2", BuiltInFunctions::keyMatch2);
             rm = e.getRoleManager();
