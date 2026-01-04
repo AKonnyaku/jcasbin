@@ -46,7 +46,8 @@ jobs:
             local pattern_unstable='.*(RoleManagerBenchmark\.roleManagerLarge|RoleManagerBenchmark\.buildRoleLinks.*Large).*'
             
             git checkout -f "$sha"
-            git clean -fdx
+            # Clean but exclude json files (results from previous runs)
+            git clean -fdx -e "*.json"
 
             # Inject JMH dependencies into pom.xml if not present
             if ! grep -q "jmh-core" pom.xml; then
@@ -130,7 +131,8 @@ jobs:
             local pattern_unstable='.*(RoleManagerBenchmark\.roleManagerLarge|RoleManagerBenchmark\.buildRoleLinks.*Large).*'
             
             git checkout -f "$sha"
-            git clean -fdx
+            # Clean but exclude json files (results from previous runs)
+            git clean -fdx -e "*.json"
 
             # Inject JMH dependencies into pom.xml if not present
             if ! grep -q "jmh-core" pom.xml; then
