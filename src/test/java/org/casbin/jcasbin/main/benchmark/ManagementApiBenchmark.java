@@ -8,30 +8,29 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-@OutputTimeUnit(TimeUnit.MILLISECONDS)
-@BenchmarkMode(Mode.Throughput)
-@State(Scope.Benchmark)
-public class BenchmarkManagement {
-
-    @Param({"1000", "10000", "100000"})
-    private int currentRuleSize;
+@OutputTimeUnit(TimeUnit.NANOSECONDS)
+@BenchmarkMode(Mode.AverageTime)
+public class ManagementApiBenchmark {
 
     private static final String MODEL_PATH = "examples/rbac_model.conf";
 
-    @State(Scope.Thread)
+    @State(Scope.Benchmark)
     public static class ThreadState {
+        @Param({"1000", "10000", "100000"})
+        public int currentRuleSize;
+
         Enforcer enforcer;
         int invocationSeed;
         List<List<String>> existingRules;
 
         @Setup(Level.Trial)
-        public void setup(BenchmarkManagement benchmark) {
+        public void setup() {
             enforcer = new Enforcer(MODEL_PATH, "", false);
             enforcer.enableLog(false);
             enforcer.enableAutoBuildRoleLinks(false);
-            
-            existingRules = new ArrayList<>(benchmark.currentRuleSize);
-            for (int i = 0; i < benchmark.currentRuleSize; i++) {
+
+            existingRules = new ArrayList<>(currentRuleSize);
+            for (int i = 0; i < currentRuleSize; i++) {
                 String user = "user" + i;
                 String data = "data" + (i / 10);
                 String act = "read";
@@ -42,8 +41,7 @@ public class BenchmarkManagement {
 
         @Setup(Level.Invocation)
         public void resetInvocation() {
-            // No reset needed for append-only or simple read tests
-            // For update/remove, we might drift, but usually ok for short duration
+            // No-op to avoid overhead if not strictly needed, but kept structure for future use
         }
     }
 
@@ -75,10 +73,7 @@ public class BenchmarkManagement {
         int index = Math.abs(state.invocationSeed) % state.existingRules.size();
         List<String> oldRule = state.existingRules.get(index);
         List<String> newRule = Arrays.asList(oldRule.get(0), oldRule.get(1) + "_updated", oldRule.get(2));
-        
+
         state.enforcer.updatePolicy(oldRule, newRule);
-        // Note: this invalidates existingRules[index] for future remove/has checks in same run, 
-        // but for benchmark throughput it's acceptable noise or we update the list (expensive).
-        // For pure throughput, we ignore list update cost.
     }
 }

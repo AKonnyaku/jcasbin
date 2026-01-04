@@ -1,0 +1,249 @@
+import sys
+import io
+
+# Set stdout to UTF-8
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
+import json
+import math
+import os
+from typing import Any, Dict, Optional, Tuple, List
+
+def load_results(path: str) -> Dict[str, Dict[str, float]]:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return {}
+
+    out: Dict[str, Dict[str, float]] = {}
+    for bench in data:
+        key = map_benchmark_key(bench)
+        if not key:
+            continue
+
+        primary = bench.get("primaryMetric", {})
+        sec, _ = metric_to_ns_per_op(primary)
+        
+        # Get Memory (B/op)
+        b_op = 0.0
+        secondary = bench.get("secondaryMetrics", {})
+        alloc_rate = secondary.get("·gc.alloc.rate.norm")
+        if alloc_rate:
+            unit = str(alloc_rate.get("scoreUnit", "") or "")
+            if unit == "B/op":
+                b_op = float(alloc_rate.get("score", 0.0))
+
+        rec = out.setdefault(key, {})
+        rec["ns_op"] = sec
+        rec["b_op"] = b_op
+    return out
+
+def metric_to_ns_per_op(metric: Dict[str, Any]) -> Tuple[float, float]:
+    score = float(metric.get("score", 0.0))
+    err = float(metric.get("scoreError", 0.0) or 0.0)
+    unit = str(metric.get("scoreUnit", "") or "")
+
+    # Convert all time units to ns
+    if unit.endswith("/op"):
+        t_unit = unit.split("/", 1)[0]
+        mult = {"ns": 1.0, "us": 1e3, "ms": 1e6, "s": 1e9}.get(t_unit)
+        if mult is None:
+            return (score, err)
+        return (score * mult, err * mult)
+
+    # Convert throughput (ops/time) to ns/op
+    if unit.startswith("ops/"):
+        denom = unit.split("/", 1)[1]
+        mult = {"ns": 1e-9, "us": 1e-6, "ms": 1e-3, "s": 1.0}.get(denom)
+        if mult is None:
+            # Default fallback if unknown unit, though unlikely in JMH
+            return (1.0 / score * 1e9 if score else 0.0, 0.0)
+        
+        # ops/unit -> ops/sec
+        ops_per_sec = score / mult
+        # ns/op = 1e9 / (ops/sec)
+        ns_op = 1e9 / ops_per_sec if ops_per_sec else 0.0
+        return (ns_op, 0.0) # Error propagation complex for inverse, skipping for report
+
+    return (score, err)
+
+def map_benchmark_key(bench: Dict[str, Any]) -> Optional[str]:
+    name = str(bench.get("benchmark", "") or "")
+    params = bench.get("params") or {}
+    
+    # Extract method name
+    if "." in name:
+        method = name.rsplit(".", 1)[-1]
+    else:
+        method = name
+
+    # Handle RBACModelSizes with params
+    if method == "rbacModelSizes":
+        size = str(params.get("size", "") or "")
+        if size in ("small", "medium", "large"):
+            return f"RBACModelSizes/{size}"
+        return None
+
+    # Handle ManagementAPI policies with params
+    if method in ("addPolicy", "removePolicy", "hasPolicy"):
+        size_val = str(params.get("currentRuleSize", "") or "")
+        size_map = {"1000": "Small", "10000": "Medium", "100000": "Large"}
+        suffix = size_map.get(size_val, "")
+        if suffix:
+            return f"{method[0].upper()}{method[1:]}{suffix}"
+        return None
+
+    # Capitalize first letter for standard benchmarks if not already
+    # e.g. rbacModel -> RBACModel, roleManagerLarge -> RoleManagerLarge
+    # Custom mappings for acronyms
+    mapping = {
+        "rbacModel": "RBACModel",
+        "abacModel": "ABACModel",
+        "abacRuleModel": "ABACRuleModel",
+        "rbacModelWithResourceRoles": "RBACModelWithResourceRoles",
+        "rbacModelWithDomains": "RBACModelWithDomains",
+        "rbacModelWithDeny": "RBACModelWithDeny",
+        "rbacModelWithDomainPatternLarge": "RBACModelWithDomainPatternLarge",
+        # Add cached versions
+        "cachedRbacModel": "CachedRBACModel",
+        "cachedAbacModel": "CachedABACModel",
+        "cachedRbacModelWithResourceRoles": "CachedRBACModelWithResourceRoles",
+        "cachedRbacModelWithDomains": "CachedRBACModelWithDomains",
+        "cachedRbacModelWithDeny": "CachedRBACModelWithDeny",
+        "cachedRbacModelMediumParallel": "CachedRBACModelMediumParallel"
+    }
+    
+    # First check explicit mapping
+    if method in mapping:
+        return mapping[method]
+    
+    # Generic capitalization for others (e.g. roleManagerLarge -> RoleManagerLarge)
+    return method[0].upper() + method[1:]
+
+def fmt_ns(ns: float) -> str:
+    if ns < 0 or math.isnan(ns): return "-"
+    return f"{ns:,.1f}"
+
+def fmt_b_op(b: float) -> str:
+    if b < 0 or math.isnan(b): return "-"
+    return f"{b:,.0f}"
+
+def get_status(diff: float, is_unstable: bool) -> str:
+    # Thresholds: Stable 10% (0.10), Unstable 15% (0.15)
+    threshold = 0.15 if is_unstable else 0.10
+    
+    if diff < -threshold:
+        return "🚀" # Faster
+    elif diff > threshold:
+        return "🐌" # Slower
+    else:
+        return "➡️" # Similar
+
+def geomean(values: List[float]) -> float:
+    vals = [v for v in values if v > 0]
+    if not vals:
+        return 0.0
+    return math.exp(sum(math.log(v) for v in vals) / len(vals))
+
+base = load_results("base-bench.json")
+pr = load_results("pr-bench.json")
+
+# Merge keys
+all_keys = sorted(list(set(base.keys()) | set(pr.keys())))
+
+# Identify unstable benchmarks for threshold logic
+# Unstable: *Large
+def is_unstable_bench(name: str) -> bool:
+    return "Large" in name
+
+print("### Benchmark Performance Report (ns/op)")
+print("")
+print("| Benchmark | Base (ns/op) | PR (ns/op) | Change | Status |")
+print("| :--- | :--- | :--- | :--- | :--- |")
+
+base_vals = []
+pr_vals = []
+
+for k in all_keys:
+    b_ns = base.get(k, {}).get("ns_op", 0.0)
+    p_ns = pr.get(k, {}).get("ns_op", 0.0)
+
+    if b_ns > 0 and p_ns > 0:
+        base_vals.append(b_ns)
+        pr_vals.append(p_ns)
+        diff = (p_ns - b_ns) / b_ns
+        status = get_status(diff, is_unstable_bench(k))
+        diff_str = f"{diff:+.2%}"
+    else:
+        diff_str = "-"
+        status = "-"
+
+    print(f"| {k} | {fmt_ns(b_ns)} | {fmt_ns(p_ns)} | {diff_str} | {status} |")
+
+# Calculate Geomean
+gb = geomean(base_vals)
+gp = geomean(pr_vals)
+if gb > 0:
+    g_diff = (gp - gb) / gb
+    # Geomean threshold uses strict 5% for visual consistency, or reuse stable threshold
+    g_status = get_status(g_diff, False) 
+    g_diff_str = f"{g_diff:+.2%}"
+else:
+    g_diff_str = "-"
+    g_status = "-"
+
+print(f"| **Geomean** | **{fmt_ns(gb)}** | **{fmt_ns(gp)}** | **{g_diff_str}** | {g_status} |")
+
+print("")
+print("### Memory Allocation Report (B/op)")
+print("")
+print("| Benchmark | Base (B/op) | PR (B/op) | Change | Status |")
+print("| :--- | :--- | :--- | :--- | :--- |")
+
+# Memory table (B/op usually stable, use 5% threshold or same logic)
+base_mem_vals = []
+pr_mem_vals = []
+
+for k in all_keys:
+    b_mem = base.get(k, {}).get("b_op", 0.0)
+    p_mem = pr.get(k, {}).get("b_op", 0.0)
+    
+    if b_mem >= 0 and p_mem >= 0: # 0 is valid for memory
+        if b_mem > 0:
+            diff = (p_mem - b_mem) / b_mem
+            diff_str = f"{diff:+.2%}"
+            # Memory usage: lower is better. 
+            if diff < -0.05: status = "🚀"
+            elif diff > 0.05: status = "🐌"
+            else: status = "➡️"
+        elif p_mem > 0: # Base 0, PR > 0 -> Infinite increase
+            diff_str = "+Inf%"
+            status = "🐌"
+        else: # Both 0
+            diff_str = "0.00%"
+            status = "➡️"
+        
+        if b_mem > 0 and p_mem > 0:
+            base_mem_vals.append(b_mem)
+            pr_mem_vals.append(p_mem)
+    else:
+        diff_str = "-"
+        status = "-"
+        
+    print(f"| {k} | {fmt_b_op(b_mem)} | {fmt_b_op(p_mem)} | {diff_str} | {status} |")
+
+# Geomean for Memory
+gb_mem = geomean(base_mem_vals)
+gp_mem = geomean(pr_mem_vals)
+if gb_mem > 0:
+    g_diff = (gp_mem - gb_mem) / gb_mem
+    if g_diff < -0.05: g_status = "🚀"
+    elif g_diff > 0.05: g_status = "🐌"
+    else: g_status = "➡️"
+    g_diff_str = f"{g_diff:+.2%}"
+else:
+    g_diff_str = "-"
+    g_status = "-"
+    
+print(f"| **Geomean** | **{fmt_b_op(gb_mem)}** | **{fmt_b_op(gp_mem)}** | **{g_diff_str}** | {g_status} |")
