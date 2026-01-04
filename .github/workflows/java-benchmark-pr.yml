@@ -21,20 +21,23 @@ jobs:
           java-version: "8"
           cache: maven
 
-      - name: Run benchmarks (base + PR)
+      - name: Calculate SHAs
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> $GITHUB_ENV
+            echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
+          else
+            echo "HEAD_SHA=${GITHUB_SHA}" >> $GITHUB_ENV
+            git fetch -q origin master
+            echo "BASE_SHA=$(git merge-base "${GITHUB_SHA}" "origin/master")" >> $GITHUB_ENV
+          fi
+
+      - name: Run Base Benchmark
         shell: bash
         run: |
           set -euo pipefail
-
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
-            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-          else
-            HEAD_SHA="${GITHUB_SHA}"
-            git fetch -q origin master
-            BASE_SHA="$(git merge-base "$HEAD_SHA" "origin/master")"
-          fi
-
+          
           run_bench () {
             local sha="$1"
             local out="$2"
@@ -56,8 +59,6 @@ jobs:
 
             set +e
             # 1. Run Stable Benchmarks (exclude unstable)
-            # Strategy: 3 warmup, 3 iterations (4s per bench) to save time for unstable ones
-            # Total ~46 stable benchmarks * 4s = ~184s
             echo "Running Stable Benchmarks..."
             java -Xms3g -Xmx3g -Xmn2g -XX:+AlwaysPreTouch -cp "target/test-classes:target/classes:$(cat cp.txt)" org.openjdk.jmh.Main \
               -wi 3 -i 3 -f 1 \
@@ -68,8 +69,6 @@ jobs:
               "$pattern_all" | tee "$tmp_log"
             
             # 2. Run Unstable Benchmarks (include only unstable)
-            # Strategy: 3 warmup, 3 iterations, 2 forks, 2s per iter to stabilize
-            # Total 4 unstable benchmarks * (2 forks * 12s) = 96s (Fast and stable with multi-fork)
             echo "Running Unstable Benchmarks..."
             java -Xms4g -Xmx4g -Xmn3g -XX:+AlwaysPreTouch -XX:+UseParallelGC -cp "target/test-classes:target/classes:$(cat cp.txt)" org.openjdk.jmh.Main \
               -wi 3 -i 3 -f 2 \
@@ -95,15 +94,79 @@ jobs:
 
             if [[ "$rc" != "0" ]]; then
               if grep -q "No matching benchmarks" "$tmp_log"; then
-                 # If one of them failed due to no match, but we have results, it might be ok.
-                 # But usually we expect matches.
                  return 0
               fi
-              # return "$rc" # Allow partial failures if needed, but for now strict
             fi
           }
 
           run_bench "$BASE_SHA" "base-bench.json"
+
+      - name: Run PR Benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          
+          run_bench () {
+            local sha="$1"
+            local out="$2"
+            local pattern_all='org\.casbin\.jcasbin\.main\.benchmark\.(EnforcerBenchmark|CachedEnforcerBenchmark|RoleManagerBenchmark|ManagementApiBenchmark)\..*'
+            # Unstable benchmarks: RoleManagerLarge and BuildRoleLinks...Large
+            local pattern_unstable='.*(RoleManagerBenchmark\.roleManagerLarge|RoleManagerBenchmark\.buildRoleLinks.*Large).*'
+            
+            git checkout -f "$sha"
+            git clean -fdx
+
+            # Inject JMH dependencies into pom.xml if not present
+            if ! grep -q "jmh-core" pom.xml; then
+              sed -i 's|</dependencies>|    <dependency><groupId>org.openjdk.jmh</groupId><artifactId>jmh-core</artifactId><version>1.37</version><scope>test</scope></dependency>\n        <dependency><groupId>org.openjdk.jmh</groupId><artifactId>jmh-generator-annprocess</artifactId><version>1.37</version><scope>test</scope></dependency>\n    </dependencies>|' pom.xml
+            fi
+
+            mvn -q clean test-compile dependency:build-classpath -DincludeScope=test -Dmdep.outputFile=cp.txt
+            local tmp_log
+            tmp_log="$(mktemp)"
+
+            set +e
+            # 1. Run Stable Benchmarks (exclude unstable)
+            echo "Running Stable Benchmarks..."
+            java -Xms3g -Xmx3g -Xmn2g -XX:+AlwaysPreTouch -cp "target/test-classes:target/classes:$(cat cp.txt)" org.openjdk.jmh.Main \
+              -wi 3 -i 3 -f 1 \
+              -w 1 -r 1 \
+              -prof gc \
+              -rf json -rff "stable.json" \
+              -e "$pattern_unstable" \
+              "$pattern_all" | tee "$tmp_log"
+            
+            # 2. Run Unstable Benchmarks (include only unstable)
+            echo "Running Unstable Benchmarks..."
+            java -Xms4g -Xmx4g -Xmn3g -XX:+AlwaysPreTouch -XX:+UseParallelGC -cp "target/test-classes:target/classes:$(cat cp.txt)" org.openjdk.jmh.Main \
+              -wi 3 -i 3 -f 2 \
+              -w 2s -r 2s \
+              -prof gc \
+              -gc true \
+              -rf json -rff "unstable.json" \
+              "$pattern_unstable" | tee -a "$tmp_log"
+            
+            local rc="${PIPESTATUS[0]}"
+            set -e
+
+            # Merge results
+            if [ -f "stable.json" ] && [ -f "unstable.json" ]; then
+                jq -s 'add' stable.json unstable.json > "$GITHUB_WORKSPACE/$out"
+            elif [ -f "stable.json" ]; then
+                mv stable.json "$GITHUB_WORKSPACE/$out"
+            elif [ -f "unstable.json" ]; then
+                mv unstable.json "$GITHUB_WORKSPACE/$out"
+            else
+                echo "[]" > "$GITHUB_WORKSPACE/$out"
+            fi
+
+            if [[ "$rc" != "0" ]]; then
+              if grep -q "No matching benchmarks" "$tmp_log"; then
+                 return 0
+              fi
+            fi
+          }
+
           run_bench "$HEAD_SHA" "pr-bench.json"
 
       - name: Generate report
