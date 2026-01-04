@@ -27,3 +27,17 @@ target-bench/
 .idea/
 *.iml
 jmh-result.json
+
+# Benchmark temporary files
+base-bench.json
+pr-bench.json
+stable.json
+unstable.json
+base_stable.json
+base_unstable.json
+pr_stable.json
+pr_unstable.json
+run1.json
+run2.json
+cp.txt
+jcasbin_benchmark_PRcheck.txt

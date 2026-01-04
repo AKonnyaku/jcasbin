@@ -45,6 +45,11 @@ jobs:
             git checkout -f "$sha"
             git clean -fdx
 
+            # Inject JMH dependencies into pom.xml if not present
+            if ! grep -q "jmh-core" pom.xml; then
+              sed -i 's|</dependencies>|    <dependency><groupId>org.openjdk.jmh</groupId><artifactId>jmh-core</artifactId><version>1.37</version><scope>test</scope></dependency>\n        <dependency><groupId>org.openjdk.jmh</groupId><artifactId>jmh-generator-annprocess</artifactId><version>1.37</version><scope>test</scope></dependency>\n    </dependencies>|' pom.xml
+            fi
+
             mvn -q clean test-compile dependency:build-classpath -DincludeScope=test -Dmdep.outputFile=cp.txt
             local tmp_log
             tmp_log="$(mktemp)"
