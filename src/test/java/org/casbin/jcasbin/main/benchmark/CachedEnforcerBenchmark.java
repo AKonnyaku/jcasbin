@@ -2,6 +2,7 @@ package org.casbin.jcasbin.main.benchmark;
 
 import org.casbin.jcasbin.main.CachedEnforcer;
 import org.casbin.jcasbin.main.ModelUnitTest;
+import org.casbin.jcasbin.model.Model;
 import org.casbin.jcasbin.util.EnforceContext;
 import org.openjdk.jmh.annotations.*;
 
