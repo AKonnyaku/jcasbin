@@ -247,7 +247,7 @@ public class CachedEnforcerBenchmark {
         public void setup() {
             e = new CachedEnforcer("examples/priority_model_enforce_context.conf", "examples/priority_policy_enforce_context.csv");
             e.enableLog(false);
-            ctx = new EnforceContext("r2", "p", "e", "m2");
+            ctx = new EnforceContext("", "", "2", "2");
         }
     }
 
