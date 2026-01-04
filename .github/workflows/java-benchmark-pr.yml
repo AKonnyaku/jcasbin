@@ -81,6 +81,13 @@ jobs:
             local rc="${PIPESTATUS[0]}"
             set -e
 
+            # DEBUG: List files to diagnose why they might be missing
+            echo "--- DEBUG: File listing after benchmarks ---"
+            ls -la
+            echo "--- DEBUG: JSON file sizes ---"
+            ls -l *.json || true
+            echo "----------------------------------------"
+
             # Merge results
             if [ -f "stable.json" ] && [ -f "unstable.json" ]; then
                 jq -s 'add' stable.json unstable.json > "$GITHUB_WORKSPACE/$out"
@@ -157,6 +164,13 @@ jobs:
             
             local rc="${PIPESTATUS[0]}"
             set -e
+
+            # DEBUG: List files to diagnose why they might be missing
+            echo "--- DEBUG: File listing after benchmarks ---"
+            ls -la
+            echo "--- DEBUG: JSON file sizes ---"
+            ls -l *.json || true
+            echo "----------------------------------------"
 
             # Merge results
             if [ -f "stable.json" ] && [ -f "unstable.json" ]; then
