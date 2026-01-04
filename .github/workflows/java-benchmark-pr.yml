@@ -94,8 +94,17 @@ jobs:
 
             if [[ "$rc" != "0" ]]; then
               if grep -q "No matching benchmarks" "$tmp_log"; then
+                 # If no matching benchmarks found, we still want to continue to generate report with empty/partial results
+                 echo "Warning: No matching benchmarks found or JMH exited with error. Check logs."
                  return 0
               fi
+              # If we have results despite error (e.g. some benchmarks failed but others passed), let's try to proceed
+              if [ -s "$GITHUB_WORKSPACE/$out" ] && [ "$(cat "$GITHUB_WORKSPACE/$out")" != "[]" ]; then
+                  echo "Warning: JMH exited with error code $rc but results were generated."
+                  return 0
+              fi
+              # If no results and error, then fail
+              return "$rc"
             fi
           }
 
@@ -162,8 +171,17 @@ jobs:
 
             if [[ "$rc" != "0" ]]; then
               if grep -q "No matching benchmarks" "$tmp_log"; then
+                 # If no matching benchmarks found, we still want to continue to generate report with empty/partial results
+                 echo "Warning: No matching benchmarks found or JMH exited with error. Check logs."
                  return 0
               fi
+              # If we have results despite error (e.g. some benchmarks failed but others passed), let's try to proceed
+              if [ -s "$GITHUB_WORKSPACE/$out" ] && [ "$(cat "$GITHUB_WORKSPACE/$out")" != "[]" ]; then
+                  echo "Warning: JMH exited with error code $rc but results were generated."
+                  return 0
+              fi
+              # If no results and error, then fail
+              return "$rc"
             fi
           }
 
