@@ -33,9 +33,12 @@ public class FrontendUnitTest {
     SyncedEnforcer e = new SyncedEnforcer("examples/rbac_model.conf", "examples/rbac_with_hierarchy_policy.csv");
     HashMap<String, Object> received = new Gson().fromJson(Frontend.casbinJsGetPermissionForUser(e, "alice"), HashMap.class);
     String expectedModelStr = new String(Files.readAllBytes(Paths.get("examples/rbac_model.conf")));
-    assertEquals(received.get("m"), expectedModelStr);
+    expectedModelStr = expectedModelStr.replace("\r\n", "\n").trim();
+    String receivedModelStr = ((String) received.get("m")).replace("\r\n", "\n").trim();
+    assertEquals(receivedModelStr, expectedModelStr);
 
     String expectedPolicyStr = new String(Files.readAllBytes(Paths.get("examples/rbac_with_hierarchy_policy.csv")));
+    expectedPolicyStr = expectedPolicyStr.replace("\r\n", "\n");
     expectedPolicyStr = Pattern.compile("\n+").matcher(expectedPolicyStr).replaceAll("\n");
     String[] expectedPolicyItem = expectedPolicyStr.split(",|\n");
     int i = 0;
