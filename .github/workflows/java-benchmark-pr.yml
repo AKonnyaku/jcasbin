@@ -7,7 +7,41 @@ on:
 jobs:
   benchmark:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: tier1_nano
+            pattern: ".*(raw|basicModel|keyMatchModel).*"
+            duration: "100ms"
+            exclude: ""
+            heap: "2G"
+          - name: tier2_micro
+            pattern: ".*(roleManagerSmall|rbacModelWithResourceRoles|rbacModelWithDomains).*"
+            duration: "200ms"
+            exclude: ""
+            heap: "2G"
+          - name: tier3_milli
+            pattern: ".*(rbacModelSmall|rbacModelMedium|roleManagerMedium|abacModel|rbacModelWithDeny|rbacModelSizes).*"
+            duration: "300ms"
+            exclude: ".*Parallel.*"
+            heap: "2G"
+          - name: tier4_write
+            pattern: ".*(ManagementApiBenchmark|priorityModel).*"
+            duration: "400ms"
+            exclude: ""
+            heap: "2G"
+          - name: tier5_parallel
+            pattern: ".*(concurrentHasLinkWithMatching).*"
+            duration: "600ms"
+            exclude: ""
+            heap: "4G"
+          - name: tier6_heavy
+            pattern: ".*(roleManagerLarge|rbacModelLarge|buildRoleLinks.*Large|hasLinkWith.*Large|Parallel).*"
+            duration: "800ms"
+            exclude: ""
+            heap: "4G"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,465 +67,139 @@ jobs:
             echo "BASE_SHA=$(git merge-base "${GITHUB_SHA}" "origin/master")" >> $GITHUB_ENV
           fi
 
-      - name: Run Base Benchmark
+      - name: Run Benchmarks (${{ matrix.name }})
         shell: bash
         run: |
           set -euo pipefail
           
-          run_bench () {
+          # JVM Tuning
+          JVM_ARGS="-Xms${{ matrix.heap }} -Xmx${{ matrix.heap }} -XX:+AlwaysPreTouch -XX:+UseParallelGC"
+          
+          run_bench_cycle() {
             local sha="$1"
-            local out="$2"
-            local pattern_all='org\.casbin\.jcasbin\.main\.benchmark\.(EnforcerBenchmark|CachedEnforcerBenchmark|RoleManagerBenchmark|ManagementApiBenchmark)\..*'
-            # Unstable benchmarks: RoleManagerLarge and BuildRoleLinks...Large
-            local pattern_unstable='.*(RoleManagerBenchmark\.roleManagerLarge|RoleManagerBenchmark\.buildRoleLinks.*Large).*'
+            local type="$2" # "base" or "pr"
             
+            echo "::group::Running $type on $sha (${{ matrix.name }})"
             git checkout -f "$sha"
-            # Clean but exclude json files (results from previous runs)
-            git clean -fdx -e "*.json"
-
-            # Inject JMH dependencies into pom.xml if not present
+            git clean -fdx -e "*.json" -e ".github"
+            
+            # Inject dependencies (JMH)
             if ! grep -q "jmh-core" pom.xml; then
               sed -i 's|</dependencies>|    <dependency><groupId>org.openjdk.jmh</groupId><artifactId>jmh-core</artifactId><version>1.37</version><scope>test</scope></dependency>\n        <dependency><groupId>org.openjdk.jmh</groupId><artifactId>jmh-generator-annprocess</artifactId><version>1.37</version><scope>test</scope></dependency>\n    </dependencies>|' pom.xml
             fi
-
+            
             mvn -q clean test-compile dependency:build-classpath -DincludeScope=test -Dmdep.outputFile=cp.txt
-            local tmp_log
-            tmp_log="$(mktemp)"
-
-            set +e
-            # 1. Run Stable Benchmarks (exclude unstable)
-            echo "Running Stable Benchmarks..."
-            java -Xms3g -Xmx3g -Xmn2g -XX:+AlwaysPreTouch -cp "target/test-classes:target/classes:$(cat cp.txt)" org.openjdk.jmh.Main \
-              -wi 3 -i 3 -f 1 \
-              -w 1 -r 1 \
-              -prof gc \
-              -rf json -rff "stable.json" \
-              -e "$pattern_unstable" \
-              "$pattern_all" | tee "$tmp_log"
+            CP_ARGS="-cp target/test-classes:target/classes:$(cat cp.txt)"
             
-            # 2. Run Unstable Benchmarks (include only unstable)
-            echo "Running Unstable Benchmarks..."
-            java -Xms4g -Xmx4g -Xmn3g -XX:+AlwaysPreTouch -XX:+UseParallelGC -cp "target/test-classes:target/classes:$(cat cp.txt)" org.openjdk.jmh.Main \
-              -wi 3 -i 3 -f 2 \
-              -w 2s -r 2s \
-              -prof gc \
-              -gc true \
-              -rf json -rff "unstable.json" \
-              "$pattern_unstable" | tee -a "$tmp_log"
+            # Helper to run a tier
+            run_tier() {
+                local pattern="$1"
+                local duration="$2"
+                local exclude="$3"
+                
+                # Minimum duration 100ms
+                if [[ "$duration" == "50ms" ]]; then duration="100ms"; fi
+                
+                echo "--> Running ${{ matrix.name }} ($duration)..."
+                
+                local exclude_arg=""
+                if [ -n "$exclude" ]; then
+                    exclude_arg="-e $exclude"
+                fi
+                
+                # Output file: e.g., base-tier1_nano.json
+                local out_file="${type}-${{ matrix.name }}.json"
+                
+                java $JVM_ARGS $CP_ARGS org.openjdk.jmh.Main \
+                    -wi 3 -i 5 -f 2 \
+                    -w $duration -r $duration \
+                    -prof gc \
+                    -rf json -rff "$out_file" \
+                    $exclude_arg \
+                    "$pattern" || true
+                    
+                # Ensure file exists
+                if [ ! -f "$out_file" ]; then echo "[]" > "$out_file"; fi
+            }
             
-            local rc="${PIPESTATUS[0]}"
-            set -e
-
-            # DEBUG: List files to diagnose why they might be missing
-            echo "--- DEBUG: File listing after benchmarks ---"
-            ls -la
-            echo "--- DEBUG: JSON file sizes ---"
-            ls -l *.json || true
-            echo "----------------------------------------"
-
-            # Merge results
-            if [ -f "stable.json" ] && [ -f "unstable.json" ]; then
-                jq -s 'add' stable.json unstable.json > "$GITHUB_WORKSPACE/$out"
-            elif [ -f "stable.json" ]; then
-                mv stable.json "$GITHUB_WORKSPACE/$out"
-            elif [ -f "unstable.json" ]; then
-                mv unstable.json "$GITHUB_WORKSPACE/$out"
-            else
-                echo "[]" > "$GITHUB_WORKSPACE/$out"
-            fi
-
-            if [[ "$rc" != "0" ]]; then
-              if grep -q "No matching benchmarks" "$tmp_log"; then
-                 # If no matching benchmarks found, we still want to continue to generate report with empty/partial results
-                 echo "Warning: No matching benchmarks found or JMH exited with error. Check logs."
-                 return 0
-              fi
-              # If we have results despite error (e.g. some benchmarks failed but others passed), let's try to proceed
-              if [ -s "$GITHUB_WORKSPACE/$out" ] && [ "$(cat "$GITHUB_WORKSPACE/$out")" != "[]" ]; then
-                  echo "Warning: JMH exited with error code $rc but results were generated."
-                  return 0
-              fi
-              # If no results and error, then fail
-              return "$rc"
-            fi
+            run_tier "${{ matrix.pattern }}" "${{ matrix.duration }}" "${{ matrix.exclude }}"
+            
+            echo "::endgroup::"
           }
-
-          run_bench "$BASE_SHA" "base-bench.json"
-
-      - name: Run PR Benchmark
-        shell: bash
-        run: |
-          set -euo pipefail
           
-          run_bench () {
-            local sha="$1"
-            local out="$2"
-            local pattern_all='org\.casbin\.jcasbin\.main\.benchmark\.(EnforcerBenchmark|CachedEnforcerBenchmark|RoleManagerBenchmark|ManagementApiBenchmark)\..*'
-            # Unstable benchmarks: RoleManagerLarge and BuildRoleLinks...Large
-            local pattern_unstable='.*(RoleManagerBenchmark\.roleManagerLarge|RoleManagerBenchmark\.buildRoleLinks.*Large).*'
-            
-            git checkout -f "$sha"
-            # Clean but exclude json files (results from previous runs)
-            git clean -fdx -e "*.json"
-
-            # Inject JMH dependencies into pom.xml if not present
-            if ! grep -q "jmh-core" pom.xml; then
-              sed -i 's|</dependencies>|    <dependency><groupId>org.openjdk.jmh</groupId><artifactId>jmh-core</artifactId><version>1.37</version><scope>test</scope></dependency>\n        <dependency><groupId>org.openjdk.jmh</groupId><artifactId>jmh-generator-annprocess</artifactId><version>1.37</version><scope>test</scope></dependency>\n    </dependencies>|' pom.xml
-            fi
-
-            mvn -q clean test-compile dependency:build-classpath -DincludeScope=test -Dmdep.outputFile=cp.txt
-            local tmp_log
-            tmp_log="$(mktemp)"
-
-            set +e
-            # 1. Run Stable Benchmarks (exclude unstable)
-            echo "Running Stable Benchmarks..."
-            java -Xms3g -Xmx3g -Xmn2g -XX:+AlwaysPreTouch -cp "target/test-classes:target/classes:$(cat cp.txt)" org.openjdk.jmh.Main \
-              -wi 3 -i 3 -f 1 \
-              -w 1 -r 1 \
-              -prof gc \
-              -rf json -rff "stable.json" \
-              -e "$pattern_unstable" \
-              "$pattern_all" | tee "$tmp_log"
-            
-            # 2. Run Unstable Benchmarks (include only unstable)
-            echo "Running Unstable Benchmarks..."
-            java -Xms4g -Xmx4g -Xmn3g -XX:+AlwaysPreTouch -XX:+UseParallelGC -cp "target/test-classes:target/classes:$(cat cp.txt)" org.openjdk.jmh.Main \
-              -wi 3 -i 3 -f 2 \
-              -w 2s -r 2s \
-              -prof gc \
-              -gc true \
-              -rf json -rff "unstable.json" \
-              "$pattern_unstable" | tee -a "$tmp_log"
-            
-            local rc="${PIPESTATUS[0]}"
-            set -e
-
-            # DEBUG: List files to diagnose why they might be missing
-            echo "--- DEBUG: File listing after benchmarks ---"
-            ls -la
-            echo "--- DEBUG: JSON file sizes ---"
-            ls -l *.json || true
-            echo "----------------------------------------"
-
-            # Merge results
-            if [ -f "stable.json" ] && [ -f "unstable.json" ]; then
-                jq -s 'add' stable.json unstable.json > "$GITHUB_WORKSPACE/$out"
-            elif [ -f "stable.json" ]; then
-                mv stable.json "$GITHUB_WORKSPACE/$out"
-            elif [ -f "unstable.json" ]; then
-                mv unstable.json "$GITHUB_WORKSPACE/$out"
-            else
-                echo "[]" > "$GITHUB_WORKSPACE/$out"
-            fi
-
-            if [[ "$rc" != "0" ]]; then
-              if grep -q "No matching benchmarks" "$tmp_log"; then
-                 # If no matching benchmarks found, we still want to continue to generate report with empty/partial results
-                 echo "Warning: No matching benchmarks found or JMH exited with error. Check logs."
-                 return 0
-              fi
-              # If we have results despite error (e.g. some benchmarks failed but others passed), let's try to proceed
-              if [ -s "$GITHUB_WORKSPACE/$out" ] && [ "$(cat "$GITHUB_WORKSPACE/$out")" != "[]" ]; then
-                  echo "Warning: JMH exited with error code $rc but results were generated."
-                  return 0
-              fi
-              # If no results and error, then fail
-              return "$rc"
-            fi
-          }
-
-          run_bench "$HEAD_SHA" "pr-bench.json"
-
-      - name: Generate report
-        shell: bash
-        run: |
-          python3 - <<'PY' > jcasbin_benchmark_PRcheck.txt
-          import json
-          import math
-          import os
-          from typing import Any, Dict, Optional, Tuple, List
-
-          def load_results(path: str) -> Dict[str, Dict[str, float]]:
-              try:
-                  with open(path, "r", encoding="utf-8") as f:
-                      data = json.load(f)
-              except FileNotFoundError:
-                  return {}
-
-              out: Dict[str, Dict[str, float]] = {}
-              for bench in data:
-                  key = map_benchmark_key(bench)
-                  if not key:
-                      continue
-
-                  primary = bench.get("primaryMetric", {})
-                  sec, _ = metric_to_ns_per_op(primary)
-                  
-                  # Get Memory (B/op)
-                  b_op = 0.0
-                  secondary = bench.get("secondaryMetrics", {})
-                  alloc_rate = secondary.get("·gc.alloc.rate.norm")
-                  if alloc_rate:
-                      unit = str(alloc_rate.get("scoreUnit", "") or "")
-                      if unit == "B/op":
-                          b_op = float(alloc_rate.get("score", 0.0))
-
-                  rec = out.setdefault(key, {})
-                  rec["ns_op"] = sec
-                  rec["b_op"] = b_op
-              return out
-
-          def metric_to_ns_per_op(metric: Dict[str, Any]) -> Tuple[float, float]:
-              score = float(metric.get("score", 0.0))
-              err = float(metric.get("scoreError", 0.0) or 0.0)
-              unit = str(metric.get("scoreUnit", "") or "")
-
-              # Convert all time units to ns
-              if unit.endswith("/op"):
-                  t_unit = unit.split("/", 1)[0]
-                  mult = {"ns": 1.0, "us": 1e3, "ms": 1e6, "s": 1e9}.get(t_unit)
-                  if mult is None:
-                      return (score, err)
-                  return (score * mult, err * mult)
-
-              # Convert throughput (ops/time) to ns/op
-              if unit.startswith("ops/"):
-                  denom = unit.split("/", 1)[1]
-                  mult = {"ns": 1e-9, "us": 1e-6, "ms": 1e-3, "s": 1.0}.get(denom)
-                  if mult is None:
-                      # Default fallback if unknown unit, though unlikely in JMH
-                      return (1.0 / score * 1e9 if score else 0.0, 0.0)
-                  
-                  # ops/unit -> ops/sec
-                  ops_per_sec = score / mult
-                  # ns/op = 1e9 / (ops/sec)
-                  ns_op = 1e9 / ops_per_sec if ops_per_sec else 0.0
-                  return (ns_op, 0.0) # Error propagation complex for inverse, skipping for report
-
-              return (score, err)
-
-          def map_benchmark_key(bench: Dict[str, Any]) -> Optional[str]:
-              name = str(bench.get("benchmark", "") or "")
-              params = bench.get("params") or {}
-              
-              # Extract method name
-              if "." in name:
-                  method = name.rsplit(".", 1)[-1]
-              else:
-                  method = name
-
-              # Handle RBACModelSizes with params
-              if method == "rbacModelSizes":
-                  size = str(params.get("size", "") or "")
-                  if size in ("small", "medium", "large"):
-                      return f"RBACModelSizes/{size}"
-                  return None
-
-              # Handle ManagementAPI policies with params
-              if method in ("addPolicy", "removePolicy", "hasPolicy"):
-                  size_val = str(params.get("currentRuleSize", "") or "")
-                  size_map = {"1000": "Small", "10000": "Medium", "100000": "Large"}
-                  suffix = size_map.get(size_val, "")
-                  if suffix:
-                      return f"{method[0].upper()}{method[1:]}{suffix}"
-                  return None
-
-              # Capitalize first letter for standard benchmarks if not already
-              # e.g. rbacModel -> RBACModel, roleManagerLarge -> RoleManagerLarge
-              # Custom mappings for acronyms
-              mapping = {
-                  "rbacModel": "RBACModel",
-                  "abacModel": "ABACModel",
-                  "abacRuleModel": "ABACRuleModel",
-                  "rbacModelWithResourceRoles": "RBACModelWithResourceRoles",
-                  "rbacModelWithDomains": "RBACModelWithDomains",
-                  "rbacModelWithDeny": "RBACModelWithDeny",
-                  "rbacModelWithDomainPatternLarge": "RBACModelWithDomainPatternLarge",
-                  # Add cached versions
-                  "cachedRbacModel": "CachedRBACModel",
-                  "cachedAbacModel": "CachedABACModel",
-                  "cachedRbacModelWithResourceRoles": "CachedRBACModelWithResourceRoles",
-                  "cachedRbacModelWithDomains": "CachedRBACModelWithDomains",
-                  "cachedRbacModelWithDeny": "CachedRBACModelWithDeny",
-                  "cachedRbacModelMediumParallel": "CachedRBACModelMediumParallel"
-              }
-              
-              # First check explicit mapping
-              if method in mapping:
-                  return mapping[method]
-              
-              # Generic capitalization for others (e.g. roleManagerLarge -> RoleManagerLarge)
-              return method[0].upper() + method[1:]
-
-          def fmt_ns(ns: float) -> str:
-              if ns < 0 or math.isnan(ns): return "-"
-              return f"{ns:,.1f}"
-
-          def fmt_b_op(b: float) -> str:
-              if b < 0 or math.isnan(b): return "-"
-              return f"{b:,.0f}"
-
-          def get_status(diff: float, is_unstable: bool) -> str:
-              # Thresholds: Stable 10% (0.10), Unstable 15% (0.15)
-              threshold = 0.15 if is_unstable else 0.10
-              
-              if diff < -threshold:
-                  return "🚀" # Faster
-              elif diff > threshold:
-                  return "🐌" # Slower
-              else:
-                  return "➡️" # Similar
-
-          def geomean(values: List[float]) -> float:
-              vals = [v for v in values if v > 0]
-              if not vals:
-                  return 0.0
-              return math.exp(sum(math.log(v) for v in vals) / len(vals))
-
-          base = load_results("base-bench.json")
-          pr = load_results("pr-bench.json")
-
-          # Merge keys
-          all_keys = sorted(list(set(base.keys()) | set(pr.keys())))
-
-          # Identify unstable benchmarks for threshold logic
-          # Unstable: *Large
-          def is_unstable_bench(name: str) -> bool:
-              return "Large" in name
-
-          print("### Benchmark Performance Report (ns/op)")
-          print("")
-          print("| Benchmark | Base (ns/op) | PR (ns/op) | Change | Status |")
-          print("| :--- | :--- | :--- | :--- | :--- |")
-
-          base_vals = []
-          pr_vals = []
-
-          for k in all_keys:
-              b_ns = base.get(k, {}).get("ns_op", 0.0)
-              p_ns = pr.get(k, {}).get("ns_op", 0.0)
-
-              if b_ns > 0 and p_ns > 0:
-                  base_vals.append(b_ns)
-                  pr_vals.append(p_ns)
-                  diff = (p_ns - b_ns) / b_ns
-                  status = get_status(diff, is_unstable_bench(k))
-                  diff_str = f"{diff:+.2%}"
-              else:
-                  diff_str = "-"
-                  status = "-"
-
-              print(f"| {k} | {fmt_ns(b_ns)} | {fmt_ns(p_ns)} | {diff_str} | {status} |")
-
-          # Calculate Geomean
-          gb = geomean(base_vals)
-          gp = geomean(pr_vals)
-          if gb > 0:
-              g_diff = (gp - gb) / gb
-              # Geomean threshold uses strict 5% for visual consistency, or reuse stable threshold
-              g_status = get_status(g_diff, False) 
-              g_diff_str = f"{g_diff:+.2%}"
-          else:
-              g_diff_str = "-"
-              g_status = "-"
-
-          print(f"| **Geomean** | **{fmt_ns(gb)}** | **{fmt_ns(gp)}** | **{g_diff_str}** | {g_status} |")
+          run_bench_cycle "$BASE_SHA" "base"
+          run_bench_cycle "$HEAD_SHA" "pr"
           
-          print("")
-          print("### Memory Allocation Report (B/op)")
-          print("")
-          print("| Benchmark | Base (B/op) | PR (B/op) | Change | Status |")
-          print("| :--- | :--- | :--- | :--- | :--- |")
-          
-          # Memory table (B/op usually stable, use 5% threshold or same logic)
-          base_mem_vals = []
-          pr_mem_vals = []
-          
-          for k in all_keys:
-              b_mem = base.get(k, {}).get("b_op", 0.0)
-              p_mem = pr.get(k, {}).get("b_op", 0.0)
-              
-              if b_mem >= 0 and p_mem >= 0: # 0 is valid for memory
-                  if b_mem > 0:
-                      diff = (p_mem - b_mem) / b_mem
-                      diff_str = f"{diff:+.2%}"
-                      # Memory usage: lower is better. 
-                      if diff < -0.05: status = "🚀"
-                      elif diff > 0.05: status = "🐌"
-                      else: status = "➡️"
-                  elif p_mem > 0: # Base 0, PR > 0 -> Infinite increase
-                      diff_str = "+Inf%"
-                      status = "🐌"
-                  else: # Both 0
-                      diff_str = "0.00%"
-                      status = "➡️"
-                  
-                  if b_mem > 0 and p_mem > 0:
-                      base_mem_vals.append(b_mem)
-                      pr_mem_vals.append(p_mem)
-              else:
-                  diff_str = "-"
-                  status = "-"
-                  
-              print(f"| {k} | {fmt_b_op(b_mem)} | {fmt_b_op(p_mem)} | {diff_str} | {status} |")
+          # Move to subfolder for upload
+          mkdir -p jcasbin
+          mv *-*.json jcasbin/
 
-          # Geomean for Memory
-          gb_mem = geomean(base_mem_vals)
-          gp_mem = geomean(pr_mem_vals)
-          if gb_mem > 0:
-              g_diff = (gp_mem - gb_mem) / gb_mem
-              if g_diff < -0.05: g_status = "🚀"
-              elif g_diff > 0.05: g_status = "🐌"
-              else: g_status = "➡️"
-              g_diff_str = f"{g_diff:+.2%}"
-          else:
-              g_diff_str = "-"
-              g_status = "-"
-              
-          print(f"| **Geomean** | **{fmt_b_op(gb_mem)}** | **{fmt_b_op(gp_mem)}** | **{g_diff_str}** | {g_status} |")
-
-          PY
-
-      - name: Upload report artifact
+      - name: Upload Shard Results
         uses: actions/upload-artifact@v4
         with:
-          name: jcasbin-benchmark-report
-          path: jcasbin_benchmark_PRcheck.txt
+          name: benchmark-shard-${{ matrix.name }}
+          path: jcasbin/*.json
 
-      - name: Comment report on PR
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+  report:
+    needs: benchmark
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          script: |
-            const fs = require('fs');
-            const body = fs.readFileSync('jcasbin_benchmark_PRcheck.txt', 'utf8');
-            const marker = '<!-- jcasbin-benchmark -->';
-            const fullBody = `${marker}\n\`\`\`\n${body}\n\`\`\``;
+          python-version: '3.12'
 
-            const { owner, repo } = context.repo;
-            const issue_number = context.payload.pull_request.number;
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: benchmark-shard-*
+          merge-multiple: true
+          path: benchmark_data/jcasbin
 
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner,
-              repo,
-              issue_number,
-              per_page: 100,
-            });
+      - name: Merge Results
+        run: |
+          # Merge all base-tier*.json into base.json
+          python .github/scripts/merge_benchmarks.py base.json benchmark_data/jcasbin/base-*.json
+          # Merge all pr-tier*.json into pr.json
+          python .github/scripts/merge_benchmarks.py pr.json benchmark_data/jcasbin/pr-*.json
 
-            const existing = comments.find(c => (c.body || '').includes(marker));
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner,
-                repo,
-                comment_id: existing.id,
-                body: fullBody,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner,
-                repo,
-                issue_number,
-                body: fullBody,
-              });
-            }
+      - name: Save commit info
+        id: commits
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          echo "base_short=${BASE_SHA:0:7}" >> $GITHUB_OUTPUT
+          echo "head_short=${HEAD_SHA:0:7}" >> $GITHUB_OUTPUT
+
+      - name: Compare benchmarks
+        run: |
+          cat > comparison.md << 'EOF'
+          ## Benchmark Comparison
+          
+          Comparing base branch (`${{ steps.commits.outputs.base_short }}`)
+          vs PR branch (`${{ steps.commits.outputs.head_short }}`)
+          
+          ```
+          EOF
+          
+          python .github/scripts/pytest_benchstat.py base.json pr.json >> comparison.md || true
+          echo '```' >> comparison.md
+          
+          # Post-process
+          python .github/scripts/benchmark_formatter.py
+
+      - name: Save PR number
+        run: |
+          echo "${{ github.event.pull_request.number }}" > pr_number.txt
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            comparison.md
+            pr_number.txt
