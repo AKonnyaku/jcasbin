@@ -36,7 +36,7 @@ jobs:
           - name: tier5_parallel
             pattern: ".*(removePolicy|rbacModelWithDeny|ManagementApiBenchmark).*"
             duration: "600ms"
-            exclude: ""
+            exclude: ".*addPolicy.*"
             heap: "4G"
           - name: tier6_heavy
             pattern: ".*(roleManagerLarge|rbacModelLarge|buildRoleLinks.*Large|hasLinkWithPatternLarge|Parallel|cachedRbacModelMediumParallel|concurrentHasLinkWithMatching).*"
@@ -48,6 +48,11 @@ jobs:
             duration: "1000ms"
             exclude: ""
             heap: "4G"
+          - name: tier8_optimized
+            pattern: ".*(addPolicy).*"
+            duration: "500ms"
+            exclude: ""
+            heap: "2G"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
