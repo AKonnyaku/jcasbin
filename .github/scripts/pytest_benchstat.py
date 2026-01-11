@@ -4,8 +4,26 @@ import math
 import re
 from collections import defaultdict
 
+import platform
+import subprocess
+
 # Force UTF-8 output
 sys.stdout.reconfigure(encoding="utf-8")
+
+def get_cpu_model():
+    try:
+        if platform.system() == "Linux":
+            with open("/proc/cpuinfo", "r") as f:
+                for line in f:
+                    if "model name" in line:
+                        return line.split(":", 1)[1].strip()
+        elif platform.system() == "Darwin": # macOS
+            return subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"]).decode().strip()
+        elif platform.system() == "Windows":
+            return subprocess.check_output("wmic cpu get name", shell=True).decode().split('\n')[1].strip()
+    except Exception:
+        pass
+    return "GitHub Actions Runner"
 
 def load_json(path):
     try:
@@ -240,7 +258,7 @@ def main():
     print("goos: linux")
     print("goarch: amd64")
     print("pkg: github.com/casbin/jcasbin") 
-    print("cpu: GitHub Actions Runner")
+    print(f"cpu: {get_cpu_model()}")
 
     # Table 1: Execution Time
     note1 = print_table(

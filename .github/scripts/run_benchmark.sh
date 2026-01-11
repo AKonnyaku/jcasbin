@@ -44,7 +44,7 @@ fi
 out_file="${TYPE}-${TIER_NAME}.json"
 
 java $JVM_ARGS $CP_ARGS org.openjdk.jmh.Main \
-    -wi 2 -i 4 -f 6 \
+    -wi 3 -i 5 -f 3 \
     -w $DURATION -r $DURATION \
     -prof gc \
     -rf json -rff "$out_file" \
