@@ -1,0 +1,208 @@
+name: performance-pr
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    name: Benchmark (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: tier1_nano
+            pattern: ".*(raw|basicModel|keyMatchModel).*"
+            duration: "100ms"
+            exclude: ""
+            heap: "2G"
+          - name: tier2_micro
+            pattern: ".*(roleManagerSmall|rbacModelWithResourceRoles|rbacModelWithDomains).*"
+            duration: "200ms"
+            exclude: ""
+            heap: "2G"
+          - name: tier3_milli
+            pattern: ".*(rbacModelSmall|rbacModelMedium|roleManagerMedium|abacModel|rbacModelWithDeny|rbacModelSizes).*"
+            duration: "300ms"
+            exclude: ".*Parallel.*"
+            heap: "2G"
+          - name: tier4_write
+            pattern: ".*(ManagementApiBenchmark|priorityModel).*"
+            duration: "400ms"
+            exclude: ""
+            heap: "2G"
+          - name: tier5_parallel
+            pattern: ".*(concurrentHasLinkWithMatching).*"
+            duration: "600ms"
+            exclude: ""
+            heap: "4G"
+          - name: tier6_heavy
+            pattern: ".*(roleManagerLarge|rbacModelLarge|buildRoleLinks.*Large|hasLinkWith.*Large|Parallel).*"
+            duration: "800ms"
+            exclude: ""
+            heap: "4G"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          clean: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "8"
+          cache: maven
+
+      - name: Check Maven
+        run: |
+          mvn -version || echo "Maven not found"
+          if ! command -v mvn &> /dev/null; then
+            echo "Installing Maven..."
+            sudo apt-get update
+            sudo apt-get install -y maven
+          fi
+
+      - name: Calculate SHAs
+        shell: bash
+        run: |
+          if [ "${ACT}" == "true" ]; then
+            echo "Running in ACT environment"
+            echo "BASE_SHA=mock-base-sha" >> $GITHUB_ENV
+            echo "HEAD_SHA=mock-head-sha" >> $GITHUB_ENV
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> $GITHUB_ENV
+            echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
+          else
+            echo "HEAD_SHA=${GITHUB_SHA}" >> $GITHUB_ENV
+            git fetch -q origin master
+            echo "BASE_SHA=$(git merge-base "${GITHUB_SHA}" "origin/master")" >> $GITHUB_ENV
+          fi
+
+      - name: Prepare Scripts
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/scripts"
+          cp -r .github/scripts/* "$RUNNER_TEMP/scripts/"
+          chmod +x "$RUNNER_TEMP/scripts/run_benchmark.sh"
+
+      - name: Run Benchmarks - Base (${{ matrix.name }})
+        shell: bash
+        run: |
+          bash "$RUNNER_TEMP/scripts/run_benchmark.sh" "$BASE_SHA" "base" "${{ matrix.name }}" "${{ matrix.pattern }}" "${{ matrix.duration }}" "${{ matrix.exclude }}" "${{ matrix.heap }}"
+
+      - name: Run Benchmarks - PR (${{ matrix.name }})
+        shell: bash
+        run: |
+          bash "$RUNNER_TEMP/scripts/run_benchmark.sh" "$HEAD_SHA" "pr" "${{ matrix.name }}" "${{ matrix.pattern }}" "${{ matrix.duration }}" "${{ matrix.exclude }}" "${{ matrix.heap }}"
+
+      - name: Organize Benchmark Results
+        shell: bash
+        run: |
+          # Move to subfolder for upload
+          if [ "${ACT}" == "true" ]; then
+             mkdir -p benchmark_data/jcasbin
+             mv *-*.json benchmark_data/jcasbin/
+          else
+             mkdir -p jcasbin
+             mv *-*.json jcasbin/
+          fi
+
+      - name: Upload Shard Results
+        if: env.ACT != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-shard-${{ matrix.name }}
+          path: jcasbin/*.json
+
+  report:
+    needs: benchmark
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          clean: false
+
+#      - name: Debug LS
+#        run: |
+#          pwd
+#          ls -R
+#          ls -R .github || true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download All Artifacts
+        if: env.ACT != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: benchmark-shard-*
+          merge-multiple: true
+          path: benchmark_data/jcasbin
+
+      - name: Merge Results
+        run: |
+          # Merge all base-tier*.json into base.json
+          python .github/scripts/merge_benchmarks.py base.json benchmark_data/jcasbin/base-*.json
+          # Merge all pr-tier*.json into pr.json
+          python .github/scripts/merge_benchmarks.py pr.json benchmark_data/jcasbin/pr-*.json
+
+      - name: Save commit info
+        id: commits
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          echo "base_short=${BASE_SHA:0:7}" >> $GITHUB_OUTPUT
+          echo "head_short=${HEAD_SHA:0:7}" >> $GITHUB_OUTPUT
+
+      - name: Compare benchmarks
+        run: |
+          cat > comparison.md << 'EOF'
+          ## Benchmark Comparison
+          
+          Comparing base branch (`${{ steps.commits.outputs.base_short }}`)
+          vs PR branch (`${{ steps.commits.outputs.head_short }}`)
+          
+          ```
+          EOF
+          
+          python .github/scripts/pytest_benchstat.py base.json pr.json >> comparison.md || true
+          echo '```' >> comparison.md
+          
+          # Post-process
+          python .github/scripts/benchmark_formatter.py
+          
+          echo "=== REPORT START ==="
+          cat comparison.md
+          echo "=== REPORT END ==="
+
+      - name: Save PR number
+        if: env.ACT != 'true'
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          if [ -z "$PR_NUMBER" ]; then
+            PR_NUMBER="${{ github.event.number }}"
+          fi
+          if [ -z "$PR_NUMBER" ]; then
+            echo "Warning: No PR number found (likely workflow_dispatch). Using '0'."
+            PR_NUMBER="0"
+          fi
+          echo "$PR_NUMBER" > pr_number.txt
+
+      - name: Upload benchmark results
+        if: env.ACT != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            benchmark_data/jcasbin/base.json
+            benchmark_data/jcasbin/pr.json
+            merged_benchmark.json
+            pr_number.txt
