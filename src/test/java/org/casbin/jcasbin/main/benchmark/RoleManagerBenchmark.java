@@ -17,6 +17,7 @@ public class RoleManagerBenchmark {
     @State(Scope.Benchmark)
     public static class RoleManagerSmallState {
         RoleManager rm;
+        String[] groups;
 
         @Setup
         public void setup() {
@@ -25,8 +26,11 @@ public class RoleManagerBenchmark {
             e.enableAutoBuildRoleLinks(false);
 
             List<List<String>> pPolicies = new ArrayList<>(100);
+            groups = new String[100];
             for (int i = 0; i < 100; i++) {
-                pPolicies.add(Arrays.asList("group" + i, "data" + (i / 10), "read"));
+                String groupName = "group" + i;
+                groups[i] = groupName;
+                pPolicies.add(Arrays.asList(groupName, "data" + (i / 10), "read"));
             }
             e.addPolicies(pPolicies);
 
@@ -40,16 +44,18 @@ public class RoleManagerBenchmark {
     }
 
     @Benchmark
-    public void roleManagerSmall(RoleManagerSmallState s) {
+    public boolean roleManagerSmall(RoleManagerSmallState s) {
         boolean out = false;
         for (int j = 0; j < 100; j++) {
-            out ^= s.rm.hasLink("user501", "group" + j);
+            out ^= s.rm.hasLink("user501", s.groups[j]);
         }
+        return out;
     }
 
     @State(Scope.Benchmark)
     public static class RoleManagerMediumState {
         RoleManager rm;
+        String[] groups;
 
         @Setup
         public void setup() {
@@ -58,8 +64,11 @@ public class RoleManagerBenchmark {
             e.enableAutoBuildRoleLinks(false);
 
             List<List<String>> pPolicies = new ArrayList<>(1000);
+            groups = new String[1000];
             for (int i = 0; i < 1000; i++) {
-                pPolicies.add(Arrays.asList("group" + i, "data" + (i / 10), "read"));
+                String groupName = "group" + i;
+                groups[i] = groupName;
+                pPolicies.add(Arrays.asList(groupName, "data" + (i / 10), "read"));
             }
             e.addPolicies(pPolicies);
 
@@ -75,16 +84,18 @@ public class RoleManagerBenchmark {
     }
 
     @Benchmark
-    public void roleManagerMedium(RoleManagerMediumState s) {
+    public boolean roleManagerMedium(RoleManagerMediumState s) {
         boolean out = false;
         for (int j = 0; j < 1000; j++) {
-            out ^= s.rm.hasLink("user501", "group" + j);
+            out ^= s.rm.hasLink("user501", s.groups[j]);
         }
+        return out;
     }
 
     @State(Scope.Benchmark)
     public static class RoleManagerLargeState {
         RoleManager rm;
+        String[] groups;
 
         @Setup
         public void setup() {
@@ -92,8 +103,11 @@ public class RoleManagerBenchmark {
             e.enableLog(false);
 
             List<List<String>> pPolicies = new ArrayList<>(10000);
+            groups = new String[10000];
             for (int i = 0; i < 10000; i++) {
-                pPolicies.add(Arrays.asList("group" + i, "data" + (i / 10), "read"));
+                String groupName = "group" + i;
+                groups[i] = groupName;
+                pPolicies.add(Arrays.asList(groupName, "data" + (i / 10), "read"));
             }
             e.addPolicies(pPolicies);
 
@@ -102,17 +116,19 @@ public class RoleManagerBenchmark {
                 gPolicies.add(Arrays.asList("user" + i, "group" + (i / 10)));
             }
             e.addGroupingPolicies(gPolicies);
+            e.buildRoleLinks();
 
             rm = e.getRoleManager();
         }
     }
 
     @Benchmark
-    public void roleManagerLarge(RoleManagerLargeState s) {
+    public boolean roleManagerLarge(RoleManagerLargeState s) {
         boolean out = false;
         for (int j = 0; j < 10000; j++) {
-            out ^= s.rm.hasLink("user501", "group" + j);
+            out ^= s.rm.hasLink("user501", s.groups[j]);
         }
+        return out;
     }
 
     @State(Scope.Benchmark)
@@ -176,13 +192,14 @@ public class RoleManagerBenchmark {
             Enforcer e = new Enforcer("examples/performance/rbac_with_pattern_large_scale_model.conf", "examples/performance/rbac_with_pattern_large_scale_policy.csv", false);
             e.enableLog(false);
             e.addNamedMatchingFunc("g", "", BuiltInFunctions::keyMatch4);
+            e.buildRoleLinks();
             rm = e.getRoleManager();
         }
     }
 
     @Benchmark
-    public void hasLinkWithPatternLarge(HasLinkWithPatternLargeState s) {
-        s.rm.hasLink("staffUser1001", "staff001", "/orgs/1/sites/site001");
+    public boolean hasLinkWithPatternLarge(HasLinkWithPatternLargeState s) {
+        return s.rm.hasLink("staffUser1001", "staff001", "/orgs/1/sites/site001");
     }
 
     @State(Scope.Benchmark)
@@ -194,13 +211,14 @@ public class RoleManagerBenchmark {
             Enforcer e = new Enforcer("examples/performance/rbac_with_pattern_large_scale_model.conf", "examples/performance/rbac_with_pattern_large_scale_policy.csv", false);
             e.enableLog(false);
             e.addNamedDomainMatchingFunc("g", "", BuiltInFunctions::keyMatch4);
+            e.buildRoleLinks();
             rm = e.getRoleManager();
         }
     }
 
    @Benchmark
-    public void hasLinkWithDomainPatternLarge(HasLinkWithDomainPatternLargeState s) {
-        s.rm.hasLink("staffUser1001", "staff001", "/orgs/1/sites/site001");
+    public boolean hasLinkWithDomainPatternLarge(HasLinkWithDomainPatternLargeState s) {
+        return s.rm.hasLink("staffUser1001", "staff001", "/orgs/1/sites/site001");
     }
 
     @State(Scope.Benchmark)
@@ -218,8 +236,8 @@ public class RoleManagerBenchmark {
     }
 
     // @Benchmark
-    public void hasLinkWithPatternAndDomainPatternLarge(HasLinkWithPatternAndDomainPatternLargeState s) {
-        s.rm.hasLink("staffUser1001", "staff001", "/orgs/1/sites/site001");
+    public boolean hasLinkWithPatternAndDomainPatternLarge(HasLinkWithPatternAndDomainPatternLargeState s) {
+        return s.rm.hasLink("staffUser1001", "staff001", "/orgs/1/sites/site001");
     }
 
     @State(Scope.Benchmark)
@@ -237,7 +255,7 @@ public class RoleManagerBenchmark {
 
     @Benchmark
     @Threads(Threads.MAX)
-    public void concurrentHasLinkWithMatching(ConcurrentHasLinkWithMatchingState s) {
-        s.rm.hasLink("alice", "/book/123");
+    public boolean concurrentHasLinkWithMatching(ConcurrentHasLinkWithMatchingState s) {
+        return s.rm.hasLink("alice", "/book/123");
     }
 }

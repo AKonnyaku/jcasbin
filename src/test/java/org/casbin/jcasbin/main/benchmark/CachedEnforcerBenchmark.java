@@ -15,9 +15,10 @@ import java.util.concurrent.TimeUnit;
 @BenchmarkMode(Mode.AverageTime)
 public class CachedEnforcerBenchmark {
 
+    private static final String[][] RAW_POLICY = new String[][]{{"alice", "data1", "read"}, {"bob", "data2", "write"}};
+
     private static boolean rawEnforce(String sub, String obj, String act) {
-        String[][] policy = new String[][]{{"alice", "data1", "read"}, {"bob", "data2", "write"}};
-        for (String[] rule : policy) {
+        for (String[] rule : RAW_POLICY) {
             if (sub.equals(rule[0]) && obj.equals(rule[1]) && act.equals(rule[2])) {
                 return true;
             }
@@ -26,8 +27,8 @@ public class CachedEnforcerBenchmark {
     }
 
     @Benchmark
-    public void cachedRaw() {
-        rawEnforce("alice", "data1", "read");
+    public boolean cachedRaw() {
+        return rawEnforce("alice", "data1", "read");
     }
 
     @State(Scope.Benchmark)
@@ -42,8 +43,8 @@ public class CachedEnforcerBenchmark {
     }
 
     @Benchmark
-    public void cachedBasicModel(CachedBasicModelState s) {
-        s.e.enforce("alice", "data1", "read");
+    public boolean cachedBasicModel(CachedBasicModelState s) {
+        return s.e.enforce("alice", "data1", "read");
     }
 
     @State(Scope.Benchmark)
@@ -58,8 +59,8 @@ public class CachedEnforcerBenchmark {
     }
 
     @Benchmark
-    public void cachedRbacModel(CachedRBACModelState s) {
-        s.e.enforce("alice", "data2", "read");
+    public boolean cachedRbacModel(CachedRBACModelState s) {
+        return s.e.enforce("alice", "data2", "read");
     }
 
     @State(Scope.Benchmark)
@@ -81,8 +82,8 @@ public class CachedEnforcerBenchmark {
     }
 
     @Benchmark
-    public void cachedRbacModelSmall(CachedRBACModelSmallState s) {
-        s.e.enforce("user501", "data9", "read");
+    public boolean cachedRbacModelSmall(CachedRBACModelSmallState s) {
+        return s.e.enforce("user501", "data9", "read");
     }
 
     @State(Scope.Benchmark)
@@ -109,8 +110,8 @@ public class CachedEnforcerBenchmark {
     }
 
     @Benchmark
-    public void cachedRbacModelMedium(CachedRBACModelMediumState s) {
-        s.e.enforce("user5001", "data150", "read");
+    public boolean cachedRbacModelMedium(CachedRBACModelMediumState s) {
+        return s.e.enforce("user5001", "data150", "read");
     }
 
     @State(Scope.Benchmark)
@@ -137,8 +138,8 @@ public class CachedEnforcerBenchmark {
     }
 
     @Benchmark
-    public void cachedRbacModelLarge(CachedRBACModelLargeState s) {
-        s.e.enforce("user50001", "data1500", "read");
+    public boolean cachedRbacModelLarge(CachedRBACModelLargeState s) {
+        return s.e.enforce("user50001", "data1500", "read");
     }
 
     @State(Scope.Benchmark)
@@ -153,8 +154,8 @@ public class CachedEnforcerBenchmark {
     }
 
     @Benchmark
-    public void cachedRbacModelWithResourceRoles(CachedRBACModelWithResourceRolesState s) {
-        s.e.enforce("alice", "data1", "read");
+    public boolean cachedRbacModelWithResourceRoles(CachedRBACModelWithResourceRolesState s) {
+        return s.e.enforce("alice", "data1", "read");
     }
 
     @State(Scope.Benchmark)
@@ -169,8 +170,8 @@ public class CachedEnforcerBenchmark {
     }
 
     @Benchmark
-    public void cachedRbacModelWithDomains(CachedRBACModelWithDomainsState s) {
-        s.e.enforce("alice", "domain1", "data1", "read");
+    public boolean cachedRbacModelWithDomains(CachedRBACModelWithDomainsState s) {
+        return s.e.enforce("alice", "domain1", "data1", "read");
     }
 
     @State(Scope.Benchmark)
@@ -187,8 +188,8 @@ public class CachedEnforcerBenchmark {
     }
 
     @Benchmark
-    public void cachedAbacModel(CachedABACModelState s) {
-        s.e.enforce("alice", s.data1, "read");
+    public boolean cachedAbacModel(CachedABACModelState s) {
+        return s.e.enforce("alice", s.data1, "read");
     }
 
     @State(Scope.Benchmark)
@@ -203,8 +204,8 @@ public class CachedEnforcerBenchmark {
     }
 
     @Benchmark
-    public void cachedKeyMatchModel(CachedKeyMatchModelState s) {
-        s.e.enforce("alice", "/alice_data/resource1", "GET");
+    public boolean cachedKeyMatchModel(CachedKeyMatchModelState s) {
+        return s.e.enforce("alice", "/alice_data/resource1", "GET");
     }
 
     @State(Scope.Benchmark)
@@ -219,8 +220,8 @@ public class CachedEnforcerBenchmark {
     }
 
     @Benchmark
-    public void cachedRbacModelWithDeny(CachedRBACModelWithDenyState s) {
-        s.e.enforce("alice", "data1", "read");
+    public boolean cachedRbacModelWithDeny(CachedRBACModelWithDenyState s) {
+        return s.e.enforce("alice", "data1", "read");
     }
 
     @State(Scope.Benchmark)
@@ -235,8 +236,8 @@ public class CachedEnforcerBenchmark {
     }
 
     @Benchmark
-    public void cachedPriorityModel(CachedPriorityModelState s) {
-        s.e.enforce("alice", "data1", "read");
+    public boolean cachedPriorityModel(CachedPriorityModelState s) {
+        return s.e.enforce("alice", "data1", "read");
     }
 
     @State(Scope.Benchmark)
@@ -276,8 +277,8 @@ public class CachedEnforcerBenchmark {
     }
 
     @Benchmark
-    public void cachedWithEnforceContext(CachedWithEnforceContextState s) {
-        s.e.enforce(s.ctx, "alice", "data1");
+    public boolean cachedWithEnforceContext(CachedWithEnforceContextState s) {
+        return s.e.enforce(s.ctx, "alice", "data1");
     }
 
     @State(Scope.Benchmark)
@@ -304,8 +305,8 @@ public class CachedEnforcerBenchmark {
     }
 
     @Benchmark
-    @Threads(Threads.MAX)
-    public void cachedRbacModelMediumParallel(CachedRBACModelMediumParallelState s) {
-        s.e.enforce("user5001", "data150", "read");
+    @Threads(4)
+    public boolean cachedRbacModelMediumParallel(CachedRBACModelMediumParallelState s) {
+        return s.e.enforce("user5001", "data150", "read");
     }
 }

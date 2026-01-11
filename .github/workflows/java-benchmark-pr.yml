@@ -24,17 +24,17 @@ jobs:
             exclude: ""
             heap: "2G"
           - name: tier3_milli
-            pattern: ".*(rbacModelSmall|rbacModelMedium|roleManagerMedium|abacModel|rbacModelSizes|rbacModelWithDomains).*"
+            pattern: ".*(rbacModelSmall|rbacModelMedium|roleManagerMedium|abacModel|rbacModelSizes).*"
             duration: "300ms"
             exclude: ".*Parallel.*"
             heap: "2G"
           - name: tier4_write
-            pattern: ".*(ManagementApiBenchmark|priorityModel|rbacModelWithDeny).*"
+            pattern: ".*(ManagementApiBenchmark|priorityModel|rbacModelWithDomains).*"
             duration: "400ms"
             exclude: ".*removePolicy.*"
             heap: "2G"
           - name: tier5_parallel
-            pattern: ".*(concurrentHasLinkWithMatching|removePolicy).*"
+            pattern: ".*(concurrentHasLinkWithMatching|removePolicy|rbacModelWithDeny).*"
             duration: "600ms"
             exclude: ""
             heap: "4G"

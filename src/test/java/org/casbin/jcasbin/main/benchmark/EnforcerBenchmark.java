@@ -14,9 +14,10 @@ import java.util.concurrent.TimeUnit;
 @BenchmarkMode(Mode.AverageTime)
 public class EnforcerBenchmark {
 
+    private static final String[][] RAW_POLICY = new String[][]{{"alice", "data1", "read"}, {"bob", "data2", "write"}};
+
     private static boolean rawEnforce(String sub, String obj, String act) {
-        String[][] policy = new String[][]{{"alice", "data1", "read"}, {"bob", "data2", "write"}};
-        for (String[] rule : policy) {
+        for (String[] rule : RAW_POLICY) {
             if (sub.equals(rule[0]) && obj.equals(rule[1]) && act.equals(rule[2])) {
                 return true;
             }
@@ -43,8 +44,8 @@ public class EnforcerBenchmark {
     }
 
     @Benchmark
-    public void raw() {
-        rawEnforce("alice", "data1", "read");
+    public boolean raw() {
+        return rawEnforce("alice", "data1", "read");
     }
 
     @State(Scope.Benchmark)
@@ -59,8 +60,8 @@ public class EnforcerBenchmark {
     }
 
     @Benchmark
-    public void basicModel(BasicModelState s) {
-        s.e.enforce("alice", "data1", "read");
+    public boolean basicModel(BasicModelState s) {
+        return s.e.enforce("alice", "data1", "read");
     }
 
     @State(Scope.Benchmark)
@@ -75,8 +76,8 @@ public class EnforcerBenchmark {
     }
 
     @Benchmark
-    public void rbacModel(RBACModelState s) {
-        s.e.enforce("alice", "data2", "read");
+    public boolean rbacModel(RBACModelState s) {
+        return s.e.enforce("alice", "data2", "read");
     }
 
     @State(Scope.Benchmark)
@@ -158,13 +159,22 @@ public class EnforcerBenchmark {
     @State(Scope.Thread)
     public static class IndexState {
         int i;
+
+        @Setup(Level.Iteration)
+        public void reset() {
+            i = 0;
+        }
     }
 
     @Benchmark
-    public void rbacModelSizes(RBACModelSizesState s, IndexState idx) {
-        Object[] args = s.enforcements[idx.i % s.enforcements.length];
-        idx.i++;
-        s.e.enforce(args);
+    public boolean rbacModelSizes(RBACModelSizesState s, IndexState idx) {
+        int i = idx.i;
+        if (i >= s.enforcements.length) {
+            i = 0;
+        }
+        Object[] args = s.enforcements[i];
+        idx.i = i + 1;
+        return s.e.enforce(args);
     }
 
     @State(Scope.Benchmark)
@@ -186,8 +196,8 @@ public class EnforcerBenchmark {
     }
 
     @Benchmark
-    public void rbacModelSmall(RBACModelSmallState s) {
-        s.e.enforce("user501", "data9", "read");
+    public boolean rbacModelSmall(RBACModelSmallState s) {
+        return s.e.enforce("user501", "data9", "read");
     }
 
     @State(Scope.Benchmark)
@@ -214,8 +224,8 @@ public class EnforcerBenchmark {
     }
 
     @Benchmark
-    public void rbacModelMedium(RBACModelMediumState s) {
-        s.e.enforce("user5001", "data99", "read");
+    public boolean rbacModelMedium(RBACModelMediumState s) {
+        return s.e.enforce("user5001", "data99", "read");
     }
 
     @State(Scope.Benchmark)
@@ -242,8 +252,8 @@ public class EnforcerBenchmark {
     }
 
     @Benchmark
-    public void rbacModelLarge(RBACModelLargeState s) {
-        s.e.enforce("user50001", "data999", "read");
+    public boolean rbacModelLarge(RBACModelLargeState s) {
+        return s.e.enforce("user50001", "data999", "read");
     }
 
     @State(Scope.Benchmark)
@@ -258,8 +268,8 @@ public class EnforcerBenchmark {
     }
 
     @Benchmark
-    public void rbacModelWithResourceRoles(RBACModelWithResourceRolesState s) {
-        s.e.enforce("alice", "data1", "read");
+    public boolean rbacModelWithResourceRoles(RBACModelWithResourceRolesState s) {
+        return s.e.enforce("alice", "data1", "read");
     }
 
     @State(Scope.Benchmark)
@@ -274,8 +284,8 @@ public class EnforcerBenchmark {
     }
 
     @Benchmark
-    public void rbacModelWithDomains(RBACModelWithDomainsState s) {
-        s.e.enforce("alice", "domain1", "data1", "read");
+    public boolean rbacModelWithDomains(RBACModelWithDomainsState s) {
+        return s.e.enforce("alice", "domain1", "data1", "read");
     }
 
     @State(Scope.Benchmark)
@@ -292,8 +302,8 @@ public class EnforcerBenchmark {
     }
 
     @Benchmark
-    public void abacModel(ABACModelState s) {
-        s.e.enforce("alice", s.data1, "read");
+    public boolean abacModel(ABACModelState s) {
+        return s.e.enforce("alice", s.data1, "read");
     }
 
     @State(Scope.Benchmark)
@@ -313,8 +323,8 @@ public class EnforcerBenchmark {
     }
 
     @Benchmark
-    public void abacRuleModel(ABACRuleModelState s) {
-        s.e.enforce(s.sub, "data100", "read");
+    public boolean abacRuleModel(ABACRuleModelState s) {
+        return s.e.enforce(s.sub, "data100", "read");
     }
 
     @State(Scope.Benchmark)
@@ -329,8 +339,8 @@ public class EnforcerBenchmark {
     }
 
     @Benchmark
-    public void keyMatchModel(KeyMatchModelState s) {
-        s.e.enforce("alice", "/alice_data/resource1", "GET");
+    public boolean keyMatchModel(KeyMatchModelState s) {
+        return s.e.enforce("alice", "/alice_data/resource1", "GET");
     }
 
     @State(Scope.Benchmark)
@@ -345,8 +355,8 @@ public class EnforcerBenchmark {
     }
 
     @Benchmark
-    public void rbacModelWithDeny(RBACModelWithDenyState s) {
-        s.e.enforce("alice", "data1", "read");
+    public boolean rbacModelWithDeny(RBACModelWithDenyState s) {
+        return s.e.enforce("alice", "data1", "read");
     }
 
     @State(Scope.Benchmark)
@@ -361,8 +371,8 @@ public class EnforcerBenchmark {
     }
 
     @Benchmark
-    public void priorityModel(PriorityModelState s) {
-        s.e.enforce("alice", "data1", "read");
+    public boolean priorityModel(PriorityModelState s) {
+        return s.e.enforce("alice", "data1", "read");
     }
 
     @State(Scope.Benchmark)
@@ -379,7 +389,7 @@ public class EnforcerBenchmark {
     }
 
     @Benchmark
-    public void rbacModelWithDomainPatternLarge(RBACModelWithDomainPatternLargeState s) {
-        s.e.enforce("staffUser1001", "/orgs/1/sites/site001", "App001.Module001.Action1001");
+    public boolean rbacModelWithDomainPatternLarge(RBACModelWithDomainPatternLargeState s) {
+        return s.e.enforce("staffUser1001", "/orgs/1/sites/site001", "App001.Module001.Action1001");
     }
 }

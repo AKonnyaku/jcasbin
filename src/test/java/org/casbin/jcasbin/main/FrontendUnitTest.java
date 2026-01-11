@@ -32,10 +32,10 @@ public class FrontendUnitTest {
   public void testCasbinJsGetPermissionForUser() throws IOException {
     SyncedEnforcer e = new SyncedEnforcer("examples/rbac_model.conf", "examples/rbac_with_hierarchy_policy.csv");
     HashMap<String, Object> received = new Gson().fromJson(Frontend.casbinJsGetPermissionForUser(e, "alice"), HashMap.class);
-    String expectedModelStr = new String(Files.readAllBytes(Paths.get("examples/rbac_model.conf")));
-    assertEquals(received.get("m"), expectedModelStr);
+    String expectedModelStr = new String(Files.readAllBytes(Paths.get("examples/rbac_model.conf"))).replace("\r\n", "\n");
+    assertEquals(received.get("m").toString().replace("\r\n", "\n"), expectedModelStr);
 
-    String expectedPolicyStr = new String(Files.readAllBytes(Paths.get("examples/rbac_with_hierarchy_policy.csv")));
+    String expectedPolicyStr = new String(Files.readAllBytes(Paths.get("examples/rbac_with_hierarchy_policy.csv"))).replace("\r\n", "\n");
     expectedPolicyStr = Pattern.compile("\n+").matcher(expectedPolicyStr).replaceAll("\n");
     String[] expectedPolicyItem = expectedPolicyStr.split(",|\n");
     int i = 0;
