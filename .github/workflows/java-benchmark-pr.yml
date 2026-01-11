@@ -6,6 +6,7 @@ on:
 
 jobs:
   benchmark:
+    name: Benchmark (${{ matrix.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -47,6 +48,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          clean: false
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -55,10 +57,23 @@ jobs:
           java-version: "8"
           cache: maven
 
+      - name: Check Maven
+        run: |
+          mvn -version || echo "Maven not found"
+          if ! command -v mvn &> /dev/null; then
+            echo "Installing Maven..."
+            sudo apt-get update
+            sudo apt-get install -y maven
+          fi
+
       - name: Calculate SHAs
         shell: bash
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          if [ "${ACT}" == "true" ]; then
+            echo "Running in ACT environment"
+            echo "BASE_SHA=mock-base-sha" >> $GITHUB_ENV
+            echo "HEAD_SHA=mock-head-sha" >> $GITHUB_ENV
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "BASE_SHA=${{ github.event.pull_request.base.sha }}" >> $GITHUB_ENV
             echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
           else
@@ -67,74 +82,30 @@ jobs:
             echo "BASE_SHA=$(git merge-base "${GITHUB_SHA}" "origin/master")" >> $GITHUB_ENV
           fi
 
-      - name: Run Benchmarks (${{ matrix.name }})
+      - name: Run Benchmarks - Base (${{ matrix.name }})
         shell: bash
         run: |
-          set -euo pipefail
-          
-          # JVM Tuning
-          JVM_ARGS="-Xms${{ matrix.heap }} -Xmx${{ matrix.heap }} -XX:+AlwaysPreTouch -XX:+UseParallelGC"
-          
-          run_bench_cycle() {
-            local sha="$1"
-            local type="$2" # "base" or "pr"
-            
-            echo "::group::Running $type on $sha (${{ matrix.name }})"
-            git checkout -f "$sha"
-            git clean -fdx -e "*.json" -e ".github"
-            
-            # Inject dependencies (JMH)
-            if ! grep -q "jmh-core" pom.xml; then
-              sed -i 's|</dependencies>|    <dependency><groupId>org.openjdk.jmh</groupId><artifactId>jmh-core</artifactId><version>1.37</version><scope>test</scope></dependency>\n        <dependency><groupId>org.openjdk.jmh</groupId><artifactId>jmh-generator-annprocess</artifactId><version>1.37</version><scope>test</scope></dependency>\n    </dependencies>|' pom.xml
-            fi
-            
-            mvn -q clean test-compile dependency:build-classpath -DincludeScope=test -Dmdep.outputFile=cp.txt
-            CP_ARGS="-cp target/test-classes:target/classes:$(cat cp.txt)"
-            
-            # Helper to run a tier
-            run_tier() {
-                local pattern="$1"
-                local duration="$2"
-                local exclude="$3"
-                
-                # Minimum duration 100ms
-                if [[ "$duration" == "50ms" ]]; then duration="100ms"; fi
-                
-                echo "--> Running ${{ matrix.name }} ($duration)..."
-                
-                local exclude_arg=""
-                if [ -n "$exclude" ]; then
-                    exclude_arg="-e $exclude"
-                fi
-                
-                # Output file: e.g., base-tier1_nano.json
-                local out_file="${type}-${{ matrix.name }}.json"
-                
-                java $JVM_ARGS $CP_ARGS org.openjdk.jmh.Main \
-                    -wi 3 -i 5 -f 2 \
-                    -w $duration -r $duration \
-                    -prof gc \
-                    -rf json -rff "$out_file" \
-                    $exclude_arg \
-                    "$pattern" || true
-                    
-                # Ensure file exists
-                if [ ! -f "$out_file" ]; then echo "[]" > "$out_file"; fi
-            }
-            
-            run_tier "${{ matrix.pattern }}" "${{ matrix.duration }}" "${{ matrix.exclude }}"
-            
-            echo "::endgroup::"
-          }
-          
-          run_bench_cycle "$BASE_SHA" "base"
-          run_bench_cycle "$HEAD_SHA" "pr"
-          
+          bash .github/scripts/run_benchmark.sh "$BASE_SHA" "base" "${{ matrix.name }}" "${{ matrix.pattern }}" "${{ matrix.duration }}" "${{ matrix.exclude }}" "${{ matrix.heap }}"
+
+      - name: Run Benchmarks - PR (${{ matrix.name }})
+        shell: bash
+        run: |
+          bash .github/scripts/run_benchmark.sh "$HEAD_SHA" "pr" "${{ matrix.name }}" "${{ matrix.pattern }}" "${{ matrix.duration }}" "${{ matrix.exclude }}" "${{ matrix.heap }}"
+
+      - name: Organize Benchmark Results
+        shell: bash
+        run: |
           # Move to subfolder for upload
-          mkdir -p jcasbin
-          mv *-*.json jcasbin/
+          if [ "${ACT}" == "true" ]; then
+             mkdir -p benchmark_data/jcasbin
+             mv *-*.json benchmark_data/jcasbin/
+          else
+             mkdir -p jcasbin
+             mv *-*.json jcasbin/
+          fi
 
       - name: Upload Shard Results
+        if: env.ACT != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-shard-${{ matrix.name }}
@@ -147,6 +118,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          clean: false
+
+#      - name: Debug LS
+#        run: |
+#          pwd
+#          ls -R
+#          ls -R .github || true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -154,6 +133,7 @@ jobs:
           python-version: '3.12'
 
       - name: Download All Artifacts
+        if: env.ACT != 'true'
         uses: actions/download-artifact@v4
         with:
           pattern: benchmark-shard-*
@@ -191,15 +171,31 @@ jobs:
           
           # Post-process
           python .github/scripts/benchmark_formatter.py
+          
+          echo "=== REPORT START ==="
+          cat comparison.md
+          echo "=== REPORT END ==="
 
       - name: Save PR number
+        if: env.ACT != 'true'
         run: |
-          echo "${{ github.event.pull_request.number }}" > pr_number.txt
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          if [ -z "$PR_NUMBER" ]; then
+            PR_NUMBER="${{ github.event.number }}"
+          fi
+          if [ -z "$PR_NUMBER" ]; then
+            echo "Warning: No PR number found (likely workflow_dispatch). Using '0'."
+            PR_NUMBER="0"
+          fi
+          echo "$PR_NUMBER" > pr_number.txt
 
       - name: Upload benchmark results
+        if: env.ACT != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results
           path: |
-            comparison.md
+            benchmark_data/jcasbin/base.json
+            benchmark_data/jcasbin/pr.json
+            merged_benchmark.json
             pr_number.txt
