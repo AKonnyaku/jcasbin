@@ -4,8 +4,26 @@ import math
 import re
 from collections import defaultdict
 
+import platform
+import subprocess
+
 # Force UTF-8 output
 sys.stdout.reconfigure(encoding="utf-8")
+
+def get_cpu_model():
+    try:
+        if platform.system() == "Linux":
+            with open("/proc/cpuinfo", "r") as f:
+                for line in f:
+                    if "model name" in line:
+                        return line.split(":", 1)[1].strip()
+        elif platform.system() == "Darwin": # macOS
+            return subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"]).decode().strip()
+        elif platform.system() == "Windows":
+            return subprocess.check_output("wmic cpu get name", shell=True).decode().split('\n')[1].strip()
+    except Exception:
+        pass
+    return "GitHub Actions Runner"
 
 def load_json(path):
     try:
@@ -46,6 +64,13 @@ def metric_to_ns_per_op(metric):
 
     return (score, error)
 
+def parse_alloc_metric(metric):
+    """Parses allocation metric (B/op)."""
+    score = float(metric.get("score", 0.0))
+    error = float(metric.get("scoreError", 0.0))
+    # We assume B/op, but could check unit if needed
+    return score, error
+
 def normalize_name(name):
     # JMH name usually includes package.class.method
     # We want just the method name or a cleaner version
@@ -64,17 +89,24 @@ def parse_benchmarks(data):
         name = normalize_name(b.get("benchmark", ""))
         if not name: continue
         
-        # Extract primary metric
+        # Extract primary metric (Time)
         primary = b.get("primaryMetric", {})
         val_ns, err_ns = metric_to_ns_per_op(primary)
+        
+        # Extract secondary metric (Alloc)
+        secondary = b.get("secondaryMetrics", {})
+        alloc_metric = secondary.get("gc.alloc.rate.norm", {})
+        alloc_val, alloc_err = parse_alloc_metric(alloc_metric)
         
         # Extract rounds/iterations if available
         # JMH 'measurementIterations'
         rounds = int(b.get("measurementIterations", 1))
         
         grouped[name].append({
-            "val": val_ns,
-            "error": err_ns,
+            "time_val": val_ns,
+            "time_err": err_ns,
+            "alloc_val": alloc_val,
+            "alloc_err": alloc_err,
             "rounds": rounds
         })
         
@@ -83,34 +115,128 @@ def parse_benchmarks(data):
     for name, entries in grouped.items():
         if not entries: continue
         
-        # Mean of means
-        vals = [e["val"] for e in entries]
-        mean = sum(vals) / len(vals)
+        # Time Stats
+        time_vals = [e["time_val"] for e in entries]
+        time_mean = sum(time_vals) / len(time_vals)
         
+        if len(time_vals) > 1:
+            time_var = sum((x - time_mean) ** 2 for x in time_vals) / (len(time_vals) - 1)
+            time_std = math.sqrt(time_var)
+        else:
+            time_std = entries[0]["time_err"]
+            
+        # Alloc Stats
+        alloc_vals = [e["alloc_val"] for e in entries]
+        alloc_mean = sum(alloc_vals) / len(alloc_vals)
+        # Alloc usually has very low variance between forks for deterministic code,
+        # but we calculate stddev anyway.
+        if len(alloc_vals) > 1:
+            alloc_var = sum((x - alloc_mean) ** 2 for x in alloc_vals) / (len(alloc_vals) - 1)
+            alloc_std = math.sqrt(alloc_var)
+        else:
+            alloc_std = entries[0]["alloc_err"]
+
         # Total rounds (approximate)
         total_rounds = sum(e["rounds"] for e in entries)
-        
-        # StdDev of the means (if we have multiple shards)
-        if len(vals) > 1:
-            variance = sum((x - mean) ** 2 for x in vals) / (len(vals) - 1)
-            stddev = math.sqrt(variance)
-        else:
-            # If only one result (typical for JMH), use its reported error as stddev
-            stddev = entries[0]["error"]
             
         aggregated[name] = {
-            "mean": mean,     # in ns
-            "stddev": stddev, # in ns
-            "rounds": len(vals) # Number of shards/samples (e.g., 5)
+            "time": {"mean": time_mean, "stddev": time_std},
+            "alloc": {"mean": alloc_mean, "stddev": alloc_std},
+            "rounds": len(entries) # Number of shards/samples
         }
     return aggregated
 
-def format_val(val_ns):
+def format_time_val(val_ns):
     if val_ns is None: return "N/A"
     if val_ns < 1000: return f"{val_ns:.2f}ns"
     if val_ns < 1e6: return f"{val_ns/1e3:.2f}us"
     if val_ns < 1e9: return f"{val_ns/1e6:.2f}ms"
     return f"{val_ns/1e9:.2f}s"
+
+def format_alloc_val(val_b):
+    if val_b is None: return "N/A"
+    # Usually integer bytes, but mean can be float
+    return f"{int(val_b)} B/op"
+
+def print_table(title, unit_label, data_extractor, format_func, all_names, base_map, pr_map):
+    w_name = 50
+    w_val = 20
+    
+    print(f"\n{title}")
+    print(f"{'':<{w_name}}│   old base.json    │   new pr.json      │")
+    print(f"{'':<{w_name}}│   {unit_label:<17}│   {unit_label:<17}│")
+
+    base_means = []
+    pr_means = []
+    
+    need_low_sample_note = False
+    
+    for name in all_names:
+        base_entry = base_map.get(name)
+        pr_entry = pr_map.get(name)
+        
+        base_val = data_extractor(base_entry)["mean"] if base_entry else 0
+        pr_val = data_extractor(pr_entry)["mean"] if pr_entry else 0
+        
+        base_std = data_extractor(base_entry)["stddev"] if base_entry else 0
+        pr_std = data_extractor(pr_entry)["stddev"] if pr_entry else 0
+        
+        base_rounds = base_entry["rounds"] if base_entry else 0
+        pr_rounds = pr_entry["rounds"] if pr_entry else 0
+
+        if base_val > 0: base_means.append(base_val)
+        if pr_val > 0: pr_means.append(pr_val)
+
+        def format_cell(val, std, rounds):
+            if val == 0: return "N/A"
+            
+            # For B/op, std is often 0 or very small.
+            if std == 0:
+                std_str = ""
+            elif rounds < 2 and std == 0:
+                std_str = "± ∞"
+            else:
+                pct = (std / val) * 100
+                if pct < 0.01: std_str = ""
+                else: std_str = f"± {pct:.0f}%"
+            
+            note = ""
+            if rounds < 6 and std == 0: # Only warn if we don't have a valid error estimate
+                note = "¹"
+                # Side effect in print_table is tricky, but acceptable for this script
+                nonlocal need_low_sample_note
+                need_low_sample_note = True
+            
+            s = format_func(val)
+            if std_str:
+                s += f" {std_str}"
+            if note:
+                s += f" {note}"
+            return s
+
+        base_str = format_cell(base_val, base_std, base_rounds) if base_entry else "N/A"
+        pr_str = format_cell(pr_val, pr_std, pr_rounds) if pr_entry else "N/A"
+
+        print(f"{name:<{w_name}} {base_str:<{w_val}} {pr_str:<{w_val}}")
+        
+    # GeoMean
+    if base_means and pr_means:
+        b_geo = [x for x in base_means if x > 0]
+        p_geo = [x for x in pr_means if x > 0]
+        
+        g_base_str = "N/A"
+        g_pr_str = "N/A"
+        
+        if b_geo:
+            g_b = math.exp(sum(math.log(x) for x in b_geo) / len(b_geo))
+            g_base_str = format_func(g_b)
+        if p_geo:
+            g_p = math.exp(sum(math.log(x) for x in p_geo) / len(p_geo))
+            g_pr_str = format_func(g_p)
+            
+        print(f"{'geomean':<{w_name}} {g_base_str:<{w_val}} {g_pr_str:<{w_val}}")
+        
+    return need_low_sample_note
 
 def main():
     if len(sys.argv) < 3:
@@ -132,76 +258,28 @@ def main():
     print("goos: linux")
     print("goarch: amd64")
     print("pkg: github.com/casbin/jcasbin") 
-    print("cpu: GitHub Actions Runner")
-    print("")
+    print(f"cpu: {get_cpu_model()}")
 
-    w_name = 50
-    w_val = 20
+    # Table 1: Execution Time
+    note1 = print_table(
+        "Execution Time:", 
+        "sec/op", 
+        lambda x: x["time"], 
+        format_time_val, 
+        all_names, base_map, pr_map
+    )
 
-    print(f"{'':<{w_name}}│   old base.json    │   new pr.json      │")
-    print(f"{'':<{w_name}}│    sec/op          │    sec/op          │")
+    # Table 2: Memory Allocation
+    note2 = print_table(
+        "Memory Allocation:", 
+        "B/op", 
+        lambda x: x["alloc"], 
+        format_alloc_val, 
+        all_names, base_map, pr_map
+    )
 
-    base_means = []
-    pr_means = []
-    
-    need_low_sample_note = False
-    need_insignificant_note = False
-
-    for name in all_names:
-        base = base_map.get(name)
-        pr = pr_map.get(name)
-
-        base_mean = base["mean"] if base else 0
-        pr_mean = pr["mean"] if pr else 0
-        
-        base_std = base["stddev"] if base else 0
-        pr_std = pr["stddev"] if pr else 0
-        
-        base_rounds = base["rounds"] if base else 0 
-        pr_rounds = pr["rounds"] if pr else 0
-
-        if base_mean > 0: base_means.append(base_mean)
-        if pr_mean > 0: pr_means.append(pr_mean)
-
-        def format_cell(val, std, rounds):
-            if val == 0: return "N/A"
-            if rounds < 2 or std == 0:
-                std_str = "± ∞"
-            else:
-                pct = (std / val) * 100
-                std_str = f"± {pct:.0f}%"
-            
-            note = ""
-            if rounds < 6:
-                note = "¹"
-                nonlocal need_low_sample_note
-                need_low_sample_note = True
-            
-            return f"{format_val(val)} {std_str} {note}"
-
-        base_str = format_cell(base_mean, base_std, base_rounds) if base else "N/A"
-        pr_str = format_cell(pr_mean, pr_std, pr_rounds) if pr else "N/A"
-
-        print(f"{name:<{w_name}} {base_str:<{w_val}} {pr_str:<{w_val}}")
-
-    if base_means and pr_means:
-        b_geo = [x for x in base_means if x > 0]
-        p_geo = [x for x in pr_means if x > 0]
-        
-        g_base_str = "N/A"
-        g_pr_str = "N/A"
-        
-        if b_geo:
-            g_b = math.exp(sum(math.log(x) for x in b_geo) / len(b_geo))
-            g_base_str = format_val(g_b)
-        if p_geo:
-            g_p = math.exp(sum(math.log(x) for x in p_geo) / len(p_geo))
-            g_pr_str = format_val(g_p)
-            
-        print(f"{'geomean':<{w_name}} {g_base_str:<{w_val}} {g_pr_str:<{w_val}}")
-
-    if need_low_sample_note:
-        print("¹ need >= 6 samples for confidence interval at level 0.95")
+    if note1 or note2:
+        print("\n¹ need >= 6 samples for confidence interval at level 0.95")
 
 if __name__ == "__main__":
     main()

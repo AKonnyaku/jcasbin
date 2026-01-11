@@ -19,30 +19,40 @@ jobs:
             exclude: ""
             heap: "2G"
           - name: tier2_micro
-            pattern: ".*(roleManagerSmall|rbacModelWithResourceRoles|rbacModelWithDomains).*"
+            pattern: ".*(roleManagerSmall|rbacModelWithResourceRoles).*"
             duration: "200ms"
             exclude: ""
             heap: "2G"
           - name: tier3_milli
-            pattern: ".*(rbacModelSmall|rbacModelMedium|roleManagerMedium|abacModel|rbacModelWithDeny|rbacModelSizes).*"
+            pattern: ".*(rbacModelSmall|rbacModelMedium|roleManagerMedium|abacModel|rbacModelSizes).*"
             duration: "300ms"
             exclude: ".*Parallel.*"
             heap: "2G"
           - name: tier4_write
-            pattern: ".*(ManagementApiBenchmark|priorityModel).*"
+            pattern: ".*(priorityModel|rbacModelWithDomains).*"
             duration: "400ms"
-            exclude: ""
+            exclude: ".*removePolicy.*"
             heap: "2G"
           - name: tier5_parallel
-            pattern: ".*(concurrentHasLinkWithMatching).*"
+            pattern: ".*(removePolicy|rbacModelWithDeny|ManagementApiBenchmark).*"
             duration: "600ms"
-            exclude: ""
+            exclude: ".*addPolicy.*"
             heap: "4G"
           - name: tier6_heavy
-            pattern: ".*(roleManagerLarge|rbacModelLarge|buildRoleLinks.*Large|hasLinkWith.*Large|Parallel).*"
+            pattern: ".*(roleManagerLarge|rbacModelLarge|buildRoleLinks.*Large|hasLinkWithPatternLarge|Parallel|cachedRbacModelMediumParallel|concurrentHasLinkWithMatching).*"
             duration: "800ms"
             exclude: ""
             heap: "4G"
+          - name: tier7_extra_heavy
+            pattern: ".*(hasLinkWithDomainPatternLarge).*"
+            duration: "1000ms"
+            exclude: ""
+            heap: "4G"
+          - name: tier8_optimized
+            pattern: ".*(addPolicy).*"
+            duration: "500ms"
+            exclude: ""
+            heap: "2G"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -204,5 +214,5 @@ jobs:
           path: |
             benchmark_data/jcasbin/base.json
             benchmark_data/jcasbin/pr.json
-            merged_benchmark.json
+            comparison.md
             pr_number.txt

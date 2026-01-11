@@ -2,7 +2,7 @@ name: Post Benchmark Comment
 
 on:
   workflow_run:
-    workflows: ["Performance Comparison for Pull Requests"]
+    workflows: ["java-benchmark-pr.yml"]
     types:
       - completed
 

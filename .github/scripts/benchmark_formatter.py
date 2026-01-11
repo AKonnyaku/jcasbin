@@ -66,6 +66,7 @@ try:
             "B": 1.0,
             "B/op": 1.0,
             "C": 1.0,  # tolerate degree/unit markers that don't affect ratio
+            "GHz": 1.0, # CPU frequency unit, treat as scalar
         }
         
         mult = multipliers.get(suffix)
