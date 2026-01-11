@@ -19,27 +19,27 @@ jobs:
             exclude: ""
             heap: "2G"
           - name: tier2_micro
-            pattern: ".*(roleManagerSmall|rbacModelWithResourceRoles|rbacModelWithDomains).*"
+            pattern: ".*(roleManagerSmall|rbacModelWithResourceRoles).*"
             duration: "200ms"
             exclude: ""
             heap: "2G"
           - name: tier3_milli
-            pattern: ".*(rbacModelSmall|rbacModelMedium|roleManagerMedium|abacModel|rbacModelWithDeny|rbacModelSizes).*"
+            pattern: ".*(rbacModelSmall|rbacModelMedium|roleManagerMedium|abacModel|rbacModelSizes|rbacModelWithDomains).*"
             duration: "300ms"
             exclude: ".*Parallel.*"
             heap: "2G"
           - name: tier4_write
-            pattern: ".*(ManagementApiBenchmark|priorityModel).*"
+            pattern: ".*(ManagementApiBenchmark|priorityModel|rbacModelWithDeny).*"
             duration: "400ms"
-            exclude: ""
+            exclude: ".*removePolicy.*"
             heap: "2G"
           - name: tier5_parallel
-            pattern: ".*(concurrentHasLinkWithMatching).*"
+            pattern: ".*(concurrentHasLinkWithMatching|removePolicy).*"
             duration: "600ms"
             exclude: ""
             heap: "4G"
           - name: tier6_heavy
-            pattern: ".*(roleManagerLarge|rbacModelLarge|buildRoleLinks.*Large|hasLinkWith.*Large|Parallel).*"
+            pattern: ".*(roleManagerLarge|rbacModelLarge|buildRoleLinks.*Large|hasLinkWith.*Large|Parallel|cachedRbacModelMediumParallel).*"
             duration: "800ms"
             exclude: ""
             heap: "4G"
