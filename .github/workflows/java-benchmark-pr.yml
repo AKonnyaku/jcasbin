@@ -204,5 +204,5 @@ jobs:
           path: |
             benchmark_data/jcasbin/base.json
             benchmark_data/jcasbin/pr.json
-            merged_benchmark.json
+            comparison.md
             pr_number.txt
