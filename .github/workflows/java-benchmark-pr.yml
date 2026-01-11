@@ -82,15 +82,22 @@ jobs:
             echo "BASE_SHA=$(git merge-base "${GITHUB_SHA}" "origin/master")" >> $GITHUB_ENV
           fi
 
+      - name: Prepare Scripts
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/scripts"
+          cp -r .github/scripts/* "$RUNNER_TEMP/scripts/"
+          chmod +x "$RUNNER_TEMP/scripts/run_benchmark.sh"
+
       - name: Run Benchmarks - Base (${{ matrix.name }})
         shell: bash
         run: |
-          bash .github/scripts/run_benchmark.sh "$BASE_SHA" "base" "${{ matrix.name }}" "${{ matrix.pattern }}" "${{ matrix.duration }}" "${{ matrix.exclude }}" "${{ matrix.heap }}"
+          bash "$RUNNER_TEMP/scripts/run_benchmark.sh" "$BASE_SHA" "base" "${{ matrix.name }}" "${{ matrix.pattern }}" "${{ matrix.duration }}" "${{ matrix.exclude }}" "${{ matrix.heap }}"
 
       - name: Run Benchmarks - PR (${{ matrix.name }})
         shell: bash
         run: |
-          bash .github/scripts/run_benchmark.sh "$HEAD_SHA" "pr" "${{ matrix.name }}" "${{ matrix.pattern }}" "${{ matrix.duration }}" "${{ matrix.exclude }}" "${{ matrix.heap }}"
+          bash "$RUNNER_TEMP/scripts/run_benchmark.sh" "$HEAD_SHA" "pr" "${{ matrix.name }}" "${{ matrix.pattern }}" "${{ matrix.duration }}" "${{ matrix.exclude }}" "${{ matrix.heap }}"
 
       - name: Organize Benchmark Results
         shell: bash
