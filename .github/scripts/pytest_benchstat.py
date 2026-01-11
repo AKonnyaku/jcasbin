@@ -175,7 +175,7 @@ def print_table(title, unit_label, data_extractor, format_func, all_names, base_
             # For B/op, std is often 0 or very small.
             if std == 0:
                 std_str = ""
-            elif rounds < 2:
+            elif rounds < 2 and std == 0:
                 std_str = "± ∞"
             else:
                 pct = (std / val) * 100
@@ -183,7 +183,7 @@ def print_table(title, unit_label, data_extractor, format_func, all_names, base_
                 else: std_str = f"± {pct:.0f}%"
             
             note = ""
-            if rounds < 6:
+            if rounds < 6 and std == 0: # Only warn if we don't have a valid error estimate
                 note = "¹"
                 # Side effect in print_table is tricky, but acceptable for this script
                 nonlocal need_low_sample_note
